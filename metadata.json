@@ -1,0 +1,7 @@
+{
+  "name": "Al-Hikmah",
+  "description": "A comprehensive Islamic companion featuring Quran with Hafs reading, Sunni Hanafi Hadiths, prayer times, AI-powered Tafsir, and community tools.",
+  "requestFramePermissions": [
+    "geolocation"
+  ]
+}
