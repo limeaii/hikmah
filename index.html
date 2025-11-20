@@ -9,6 +9,9 @@
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
     <link href="https://fonts.googleapis.com/css2?family=Amiri:ital,wght@0,400;0,700;1,400&family=Inter:wght@300;400;500;600;700&family=Lateef&display=swap" rel="stylesheet">
+    <!-- Babel for JSX compilation in browser -->
+    <script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
+    
     <style>
       body {
         font-family: 'Inter', sans-serif;
@@ -16,28 +19,14 @@
         background-image: radial-gradient(#e2e8f0 1px, transparent 1px);
         background-size: 24px 24px;
       }
-      .font-arabic {
-        font-family: 'Amiri', serif;
-      }
-      .font-quran {
-        font-family: 'Lateef', serif; /* A thicker, more traditional Quranic font style if available, fallback to serif */
-      }
+      .font-arabic { font-family: 'Amiri', serif; }
+      .font-quran { font-family: 'Lateef', serif; }
       
       /* Soft Scrollbar */
-      ::-webkit-scrollbar {
-        width: 6px;
-        height: 6px;
-      }
-      ::-webkit-scrollbar-track {
-        background: transparent;
-      }
-      ::-webkit-scrollbar-thumb {
-        background: #cbd5e1;
-        border-radius: 10px;
-      }
-      ::-webkit-scrollbar-thumb:hover {
-        background: #94a3b8;
-      }
+      ::-webkit-scrollbar { width: 6px; height: 6px; }
+      ::-webkit-scrollbar-track { background: transparent; }
+      ::-webkit-scrollbar-thumb { background: #cbd5e1; border-radius: 10px; }
+      ::-webkit-scrollbar-thumb:hover { background: #94a3b8; }
 
       /* Utilities */
       .glass-panel {
@@ -45,48 +34,841 @@
         backdrop-filter: blur(12px);
         -webkit-backdrop-filter: blur(12px);
       }
-      
       .ornament-divider {
-        display: flex;
-        align-items: center;
-        text-align: center;
-        color: #cbd5e1;
-        margin: 2rem 0;
+        display: flex; align-items: center; text-align: center; color: #cbd5e1; margin: 2rem 0;
       }
       .ornament-divider::before, .ornament-divider::after {
-        content: '';
-        flex: 1;
-        border-bottom: 1px solid #e2e8f0;
+        content: ''; flex: 1; border-bottom: 1px solid #e2e8f0;
       }
-      .ornament-divider span {
-        padding: 0 10px;
-        font-size: 1.2rem;
-      }
+      .ornament-divider span { padding: 0 10px; font-size: 1.2rem; }
+      
+      .slide-in { animation: slideIn 0.3s ease-out forwards; }
+      @keyframes slideIn { from { opacity: 0; transform: translateY(10px); } to { opacity: 1; transform: translateY(0); } }
     </style>
-    <script>
-      // --- CRITICAL FIX FOR WHITE SCREEN ---
-      // Browsers don't have 'process'. We define it here.
-      // To "engrave" your API key so it works without the preview:
-      // Replace the empty string below with your actual key, e.g., API_KEY: 'AIzaSy...'
-      window.process = {
-        env: {
-          API_KEY: '' 
-        }
-      };
-    </script>
-  <script type="importmap">
+
+    <script type="importmap">
 {
   "imports": {
-    "lucide-react": "https://aistudiocdn.com/lucide-react@^0.554.0",
-    "@google/genai": "https://aistudiocdn.com/@google/genai@^1.30.0",
+    "react": "https://esm.sh/react@18.2.0",
+    "react-dom/client": "https://esm.sh/react-dom@18.2.0/client",
+    "lucide-react": "https://esm.sh/lucide-react@0.330.0",
+    "@google/genai": "https://esm.sh/@google/genai@0.1.1",
     "react-dom/": "https://aistudiocdn.com/react-dom@^19.2.0/",
-    "react/": "https://aistudiocdn.com/react@^19.2.0/",
-    "react": "https://aistudiocdn.com/react@^19.2.0"
+    "react/": "https://aistudiocdn.com/react@^19.2.0/"
   }
 }
 </script>
 </head>
-  <body class="text-slate-800 antialiased selection:bg-emerald-100 selection:text-emerald-900">
+<body class="text-slate-800 antialiased selection:bg-emerald-100 selection:text-emerald-900">
     <div id="root"></div>
-  </body>
+
+    <script type="text/babel" data-type="module">
+      import React, { useState, useEffect, useCallback, useRef } from 'react';
+      import { createRoot } from 'react-dom/client';
+      import { 
+        BookOpen, LogOut, Search, Compass, 
+        Calendar, Hand, Heart, Calculator, MessageCircle, 
+        Menu, X, ChevronRight, ChevronLeft, PlayCircle,
+        Bookmark as BookmarkIcon, Loader2, Grid, Lock, 
+        Moon, Sun, CheckCircle, Utensils, Brain, Info, 
+        ArrowLeft, Send, Share2, Coffee, AlignLeft, Book,
+        Star, Layers, Sparkles
+      } from 'lucide-react';
+      import { GoogleGenAI } from "@google/genai";
+
+      // ==========================================
+      // CONFIGURATION - API KEY ENGRAVED
+      // ==========================================
+      const API_KEY = "AIzaSyB_GbARd5JzPeXmM1VPQwKZFH9tZa5PfDE";
+
+      // --- Constants & Data ---
+
+      const DB_KEY = 'noor_users_db_v3';
+      const BISMILLAH = "بِسْمِ ٱللَّهِ ٱلرَّحْمَٰنِ ٱلرَّحِيمِ";
+      const ZAKAT_THRESHOLD_GOLD_GRAMS = 87.48;
+
+      const ViewState = {
+        AUTH: 'AUTH',
+        DASHBOARD: 'DASHBOARD',
+        QURAN_INDEX: 'QURAN_INDEX',
+        QURAN_READ: 'QURAN_READ',
+        HADITH: 'HADITH',
+        SCHOLAR: 'SCHOLAR',
+        HUB: 'HUB',
+        QUIZ: 'QUIZ',
+        DREAM: 'DREAM',
+        HALAL: 'HALAL',
+        ZAKAT: 'ZAKAT',
+        TASBIH: 'TASBIH',
+        NAMES: 'NAMES',
+        DUA: 'DUA',
+        SALAH: 'SALAH',
+        FOODS: 'FOODS',
+      };
+
+      const SURAHS = [
+        { number: 1, name: "Al-Fatiha", englishName: "Al-Fatiha", englishNameTranslation: "The Opening", numberOfAyahs: 7, revelationType: "Meccan" },
+        { number: 2, name: "Al-Baqarah", englishName: "Al-Baqarah", englishNameTranslation: "The Cow", numberOfAyahs: 286, revelationType: "Medinan" },
+        { number: 3, name: "Al-Imran", englishName: "Aal-E-Imran", englishNameTranslation: "The Family of Imran", numberOfAyahs: 200, revelationType: "Medinan" },
+        { number: 4, name: "An-Nisa", englishName: "An-Nisa", englishNameTranslation: "The Women", numberOfAyahs: 176, revelationType: "Medinan" },
+        { number: 18, name: "Al-Kahf", englishName: "Al-Kahf", englishNameTranslation: "The Cave", numberOfAyahs: 110, revelationType: "Meccan" },
+        { number: 36, name: "Ya-Sin", englishName: "Ya-Sin", englishNameTranslation: "Ya Sin", numberOfAyahs: 83, revelationType: "Meccan" },
+        { number: 55, name: "Ar-Rahman", englishName: "Ar-Rahman", englishNameTranslation: "The Beneficent", numberOfAyahs: 78, revelationType: "Medinan" },
+        { number: 67, name: "Al-Mulk", englishName: "Al-Mulk", englishNameTranslation: "The Sovereignty", numberOfAyahs: 30, revelationType: "Meccan" },
+        { number: 112, name: "Al-Ikhlas", englishName: "Al-Ikhlas", englishNameTranslation: "The Sincerity", numberOfAyahs: 4, revelationType: "Meccan" },
+        { number: 113, name: "Al-Falaq", englishName: "Al-Falaq", englishNameTranslation: "The Daybreak", numberOfAyahs: 5, revelationType: "Meccan" },
+        { number: 114, name: "An-Nas", englishName: "An-Nas", englishNameTranslation: "Mankind", numberOfAyahs: 6, revelationType: "Meccan" },
+      ];
+      // Populate rest of Surahs roughly for UI completeness
+      for(let i=1; i<=114; i++) {
+         if(!SURAHS.find(s => s.number === i)) {
+             SURAHS.push({ number: i, name: `Surah ${i}`, englishName: `Surah ${i}`, englishNameTranslation: "", numberOfAyahs: 0, revelationType: "" });
+         }
+      }
+      SURAHS.sort((a,b) => a.number - b.number);
+
+      const ALLAH_NAMES = [
+        { name: "Ar-Rahman", meaning: "The Beneficent" }, { name: "Ar-Raheem", meaning: "The Merciful" },
+        { name: "Al-Malik", meaning: "The King" }, { name: "Al-Quddus", meaning: "The Most Holy" },
+        { name: "As-Salam", meaning: "The Source of Peace" }, { name: "Al-Mu'min", meaning: "The Guardian of Faith" },
+        { name: "Al-Muhaymin", meaning: "The Protector" }, { name: "Al-Aziz", meaning: "The Mighty" },
+        { name: "Al-Jabbar", meaning: "The Compeller" }, { name: "Al-Mutakabbir", meaning: "The Majestic" }
+      ];
+
+      const DUAS_DATA = [
+        {
+          category: "Morning & Evening",
+          items: [
+            { arabic: "الحَمْدُ لِلَّهِ الَّذِي أَحْيَانَا بَعْدَ مَا أمَاتَنَا وإِلَيْهِ النُّشُورُ", transliteration: "Alhamdu lillahil-lathee ahyana...", translation: "Praise is to Allah Who gave us life...", ref: "Bukhari" }
+          ]
+        },
+        {
+          category: "Distress",
+          items: [
+            { arabic: "لَا إِلَهَ إِلَّا أَنْتَ سُبْحَانَكَ إِنِّي كُنْتُ مِنَ الظَّالِمِينَ", transliteration: "La ilaha illa anta subhanaka...", translation: "There is no deity but You...", ref: "Quran 21:87" }
+          ]
+        }
+      ];
+
+      const SALAH_STEPS = [
+        { step: 1, title: "Takbiratul Ihram", desc: "Say 'Allahu Akbar' to start." },
+        { step: 2, title: "Qiyam", desc: "Stand and recite Al-Fatiha." },
+        { step: 3, title: "Ruku", desc: "Bow down saying 'Subhana Rabbiyal Azeem'." },
+        { step: 4, title: "Sujud", desc: "Prostrate saying 'Subhana Rabbiyal A'la'." }
+      ];
+
+      const SUNNAH_FOODS_DATA = [
+        { name: "Dates", benefit: "Energy & Digestion", ref: "Muslim" },
+        { name: "Honey", benefit: "Healing & Immunity", ref: "Quran" },
+        { name: "Olive Oil", benefit: "Heart Health", ref: "Tirmidhi" },
+        { name: "Black Seed", benefit: "Cure for diseases", ref: "Bukhari" }
+      ];
+
+      // --- Gemini Service Logic ---
+
+      const ai = new GoogleGenAI({ apiKey: API_KEY });
+      const fastModel = 'gemini-2.5-flash';
+
+      const GeminiService = {
+        getSurahAyahs: async (surahNumber, start, count) => {
+            if (!API_KEY) return [];
+            try {
+                const prompt = `Retrieve verses ${start} to ${start + count - 1} of Surah ${surahNumber}. Return JSON: { ayahs: [{ numberInSurah: int, text: "arabic", transliteration: "text", translation: "text" }] }`;
+                const response = await ai.models.generateContent({
+                    model: fastModel, contents: prompt, config: { responseMimeType: "application/json" }
+                });
+                const data = JSON.parse(response.text || '{"ayahs": []}');
+                return data.ayahs.map(a => ({ ...a, number: surahNumber }));
+            } catch (e) { console.error(e); return []; }
+        },
+
+        getHanafiHadiths: async (topic) => {
+            if (!API_KEY) return [];
+            try {
+                const prompt = `Provide 5 authentic Sunni Hanafi Hadiths about "${topic}". Return JSON: { hadiths: [{ source: "Bukhari/etc", narrator: "name", arabic: "text", english: "text", grade: "Sahih" }] }`;
+                const response = await ai.models.generateContent({
+                    model: fastModel, contents: prompt, config: { responseMimeType: "application/json" }
+                });
+                const data = JSON.parse(response.text || '{"hadiths": []}');
+                return data.hadiths.map((h, i) => ({ id: Date.now()+i, ...h }));
+            } catch (e) { return []; }
+        },
+
+        askScholarAI: async (question) => {
+            if (!API_KEY) return "API Key is missing.";
+            try {
+                const response = await ai.models.generateContent({
+                    model: fastModel,
+                    contents: question,
+                    config: {
+                        systemInstruction: `You are a Sunni Hanafi Scholar. Format your response exactly as follows:
+                        PART 1: A direct bold answer (max 2 sentences).
+                        PART 2: A detailed explanation.
+                        Separator: |||
+                        Example: Yes, it is halal.|||The evidence is...`,
+                    }
+                });
+                return response.text;
+            } catch (e) { return "I am unable to answer at this moment."; }
+        },
+
+        getTafsir: async (surah, ayah) => {
+            if (!API_KEY) return "API Key missing.";
+            try {
+                const res = await ai.models.generateContent({ model: fastModel, contents: `Sunni Tafsir for Surah ${surah} Ayah ${ayah}.` });
+                return res.text;
+            } catch(e) { return "Tafsir unavailable."; }
+        },
+
+        getIslamicQuiz: async () => {
+             if (!API_KEY) return [];
+             try {
+                 const prompt = `Generate 5 Islamic multiple choice questions (Sunni). JSON: { questions: [{ question: "", options: ["A","B","C","D"], correctAnswer: int_index, explanation: "" }] }`;
+                 const res = await ai.models.generateContent({ model: fastModel, contents: prompt, config: { responseMimeType: "application/json" } });
+                 return JSON.parse(res.text || '{"questions":[]}').questions;
+             } catch(e) { return []; }
+        },
+
+        getAyahByMood: async (mood) => {
+            if (!API_KEY) return null;
+            try {
+                const prompt = `Find a Quran verse for someone feeling "${mood}". JSON: { "arabic": "", "translation": "", "ref": "Surah:Ayah" }`;
+                const res = await ai.models.generateContent({ model: fastModel, contents: prompt, config: { responseMimeType: "application/json" } });
+                return JSON.parse(res.text);
+            } catch(e) { return null; }
+        },
+
+        interpretDream: async (dream) => {
+            if (!API_KEY) return "API Key missing.";
+            try {
+                const res = await ai.models.generateContent({ 
+                    model: fastModel, 
+                    contents: `Interpret this dream from an Islamic perspective (Sunni/Ibn Sirin): "${dream}". Format: Answer ||| Explanation.` 
+                });
+                return res.text;
+            } catch(e) { return "Error interpreting dream."; }
+        },
+
+        checkHalalStatus: async (query) => {
+            if (!API_KEY) return "API Key missing.";
+            try {
+                const res = await ai.models.generateContent({ 
+                    model: fastModel, 
+                    contents: `Halal status of "${query}". Highlight Haram/Mushbooh. Format: Verdict ||| Details.` 
+                });
+                return res.text;
+            } catch(e) { return "Error checking status."; }
+        }
+      };
+
+      // --- Components ---
+
+      const SidebarItem = ({ icon: Icon, label, active, onClick }) => (
+        <button onClick={onClick} className={`w-full flex items-center gap-3 px-4 py-3 rounded-xl transition-all duration-200 group ${active ? 'bg-emerald-50 text-emerald-700 font-bold ring-1 ring-emerald-100' : 'text-slate-500 hover:bg-slate-50 hover:text-slate-800'}`}>
+          <Icon size={18} className={active ? 'text-emerald-600' : 'text-slate-400 group-hover:text-emerald-600'} />
+          <span className="text-sm">{label}</span>
+          {active && <div className="ml-auto w-1.5 h-1.5 rounded-full bg-emerald-500"></div>}
+        </button>
+      );
+
+      const FormattedResponse = ({ text }) => {
+        if (!text) return null;
+        const parts = text.split('|||');
+        if (parts.length > 1) {
+            return (
+                <div className="space-y-5">
+                    <div className="bg-emerald-50/50 border-l-4 border-emerald-500 p-4 rounded-r-xl"><p className="font-bold text-slate-900 text-lg leading-snug">{parts[0].trim()}</p></div>
+                    <div className="text-slate-700 leading-relaxed space-y-4 text-base whitespace-pre-wrap pl-1">{parts[1].trim()}</div>
+                </div>
+            );
+        }
+        return <p className="text-slate-700 leading-relaxed whitespace-pre-wrap">{text}</p>;
+      };
+
+      const AppGridItem = ({ icon: Icon, label, color, onClick, description }) => (
+        <button onClick={onClick} className="flex flex-col items-start p-5 bg-white rounded-2xl shadow-sm border border-slate-100 hover:shadow-lg hover:border-emerald-100 transition-all hover:-translate-y-1 group h-full text-left w-full">
+          <div className={`w-12 h-12 rounded-2xl flex items-center justify-center ${color} text-white shadow-md mb-4 group-hover:scale-110 transition duration-300`}>
+            <Icon size={22} strokeWidth={2.5} />
+          </div>
+          <span className="text-sm font-bold text-slate-700 mb-1">{label}</span>
+          {description && <span className="text-xs text-slate-400 leading-tight font-medium">{description}</span>}
+        </button>
+      );
+
+      const Loading = () => (
+        <div className="flex flex-col justify-center items-center py-20 gap-6">
+            <div className="relative">
+                 <div className="absolute inset-0 bg-emerald-100 rounded-full blur-xl opacity-50 animate-pulse"></div>
+                 <Loader2 className="animate-spin text-emerald-600 relative z-10" size={48} />
+            </div>
+            <p className="text-slate-400 text-sm font-medium animate-pulse">Consulting the knowledge...</p>
+        </div>
+      );
+
+      // --- Main Application ---
+
+      const App = () => {
+        // State
+        const [user, setUser] = useState(null);
+        const [view, setView] = useState(ViewState.AUTH);
+        const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
+        
+        // Feature State
+        const [currentSurah, setCurrentSurah] = useState(1);
+        const [ayahs, setAyahs] = useState([]);
+        const [loadingAyahs, setLoadingAyahs] = useState(false);
+        const [hadiths, setHadiths] = useState([]);
+        const [hadithTopic, setHadithTopic] = useState("faith");
+        const [loadingHadiths, setLoadingHadiths] = useState(false);
+        const [chatHistory, setChatHistory] = useState([]);
+        const [chatInput, setChatInput] = useState('');
+        const [isChatLoading, setIsChatLoading] = useState(false);
+        const [tasbihCount, setTasbihCount] = useState(0);
+        
+        // Auth State
+        const [username, setUsername] = useState('');
+        const [password, setPassword] = useState('');
+        const [isReg, setIsReg] = useState(false);
+        const [authError, setAuthError] = useState('');
+
+        // New Features State
+        const [quizQ, setQuizQ] = useState([]);
+        const [quizIdx, setQuizIdx] = useState(0);
+        const [quizScore, setQuizScore] = useState(0);
+        const [quizState, setQuizState] = useState({ answered: false, sel: null });
+        const [dreamIn, setDreamIn] = useState('');
+        const [dreamRes, setDreamRes] = useState('');
+        const [halalIn, setHalalIn] = useState('');
+        const [halalRes, setHalalRes] = useState('');
+        const [zakatAssets, setZakatAssets] = useState('');
+        const [zakatRes, setZakatRes] = useState(null);
+        const [moodRes, setMoodRes] = useState(null);
+        const [moodLoad, setMoodLoad] = useState(false);
+        const [tafsirOpen, setTafsirOpen] = useState(null);
+        const [tafsirTxt, setTafsirTxt] = useState('');
+        const [searchTerm, setSearchTerm] = useState('');
+
+        const chatEndRef = useRef(null);
+
+        useEffect(() => {
+            const sess = sessionStorage.getItem('active_user');
+            if(sess) { setUser(JSON.parse(sess)); setView(ViewState.DASHBOARD); }
+        }, []);
+
+        useEffect(() => { if(user) setTasbihCount(user.tasbihCount || 0); }, [user]);
+        useEffect(() => { chatEndRef.current?.scrollIntoView({ behavior: 'smooth' }); }, [chatHistory]);
+
+        // Logic
+        const handleAuth = () => {
+            if(!username || !password) return setAuthError("Fill all fields");
+            const db = JSON.parse(localStorage.getItem(DB_KEY) || '{}');
+            if(isReg) {
+                if(db[username]) return setAuthError("Username taken");
+                const newUser = { username, password, favorites: [], tasbihCount: 0, quizScore: 0, lastReadSurah: 1, lastReadAyah: 1 };
+                db[username] = newUser;
+                localStorage.setItem(DB_KEY, JSON.stringify(db));
+                login(newUser);
+            } else {
+                if(db[username] && db[username].password === password) login(db[username]);
+                else setAuthError("Invalid credentials");
+            }
+        };
+
+        const login = (u) => {
+            // Ensure favorites array exists for old users
+            if(!u.favorites) u.favorites = [];
+            setUser(u); sessionStorage.setItem('active_user', JSON.stringify(u)); setView(ViewState.DASHBOARD);
+        };
+
+        const logout = () => {
+            setUser(null); sessionStorage.removeItem('active_user'); setView(ViewState.AUTH);
+        };
+
+        const updateUser = (updates) => {
+            if(!user) return;
+            const newUser = { ...user, ...updates };
+            setUser(newUser);
+            const db = JSON.parse(localStorage.getItem(DB_KEY) || '{}');
+            db[user.username] = newUser;
+            localStorage.setItem(DB_KEY, JSON.stringify(db));
+            sessionStorage.setItem('active_user', JSON.stringify(newUser));
+        }
+
+        const isFavorite = (type, ref) => {
+            if (!user || !user.favorites) return false;
+            if (type === 'surah') return user.favorites.some(f => f.type === 'surah' && f.ref === ref);
+            else return user.favorites.some(f => f.type === 'ayah' && f.ref.surah === ref.surah && f.ref.ayah === ref.ayah);
+        };
+
+        const toggleFav = (type, ref) => {
+            let favs = [...(user.favorites || [])];
+            const exists = isFavorite(type, ref);
+            if(exists) {
+                favs = favs.filter(f => !(f.type === type && (type === 'surah' ? f.ref === ref : (f.ref.surah === ref.surah && f.ref.ayah === ref.ayah))));
+            } else {
+                favs.push({ id: Date.now(), type, ref });
+            }
+            updateUser({ favorites: favs });
+        };
+
+        const loadSurah = async (num) => {
+            setLoadingAyahs(true); setView(ViewState.QURAN_READ); setCurrentSurah(num); setAyahs([]);
+            const data = await GeminiService.getSurahAyahs(num, 1, 15);
+            setAyahs(data); setLoadingAyahs(false);
+            updateUser({ lastReadSurah: num });
+        };
+
+        const handleMood = async (m) => {
+            setMoodLoad(true); setMoodRes(null);
+            const res = await GeminiService.getAyahByMood(m);
+            setMoodRes(res); setMoodLoad(false);
+        };
+
+        const handleScholar = async () => {
+            if(!chatInput) return;
+            const msg = chatInput; setChatInput('');
+            setChatHistory(prev => [...prev, { role: 'user', text: msg }]);
+            setIsChatLoading(true);
+            const res = await GeminiService.askScholarAI(msg);
+            setChatHistory(prev => [...prev, { role: 'model', text: res }]);
+            setIsChatLoading(false);
+        };
+
+        const startQuiz = async () => {
+            setView(ViewState.QUIZ); setIsChatLoading(true);
+            const q = await GeminiService.getIslamicQuiz();
+            setQuizQ(q); setQuizIdx(0); setQuizScore(0); setQuizState({ answered: false, sel: null });
+            setIsChatLoading(false);
+        };
+
+        const handleQuizAns = (idx) => {
+            if(quizState.answered) return;
+            const correct = idx === quizQ[quizIdx].correctAnswer;
+            setQuizState({ answered: true, sel: idx });
+            if(correct) setQuizScore(s => s + 1);
+        };
+
+        const nextQuiz = () => {
+            if(quizIdx < quizQ.length - 1) {
+                setQuizIdx(i => i + 1); setQuizState({ answered: false, sel: null });
+            } else {
+                alert(`Score: ${quizScore}/${quizQ.length}`);
+                updateUser({ quizScore: Math.max(user.quizScore || 0, quizScore) });
+                setView(ViewState.HUB);
+            }
+        };
+
+        const calcZakat = () => {
+            const assets = parseFloat(zakatAssets);
+            if(!assets) return;
+            const nisaab = ZAKAT_THRESHOLD_GOLD_GRAMS * 65; // approx gold price
+            setZakatRes({ eligible: assets >= nisaab, amount: assets * 0.025, nisaab });
+        };
+
+        // Render Helpers
+        if(view === ViewState.AUTH) {
+            return (
+                <div className="min-h-screen flex items-center justify-center p-6 bg-slate-50 relative">
+                   <div className="bg-white/80 backdrop-blur-xl w-full max-w-md p-10 rounded-[2.5rem] shadow-2xl border border-white">
+                      <h1 className="text-6xl font-bold text-emerald-700 mb-3 text-center font-arabic">الحكمة</h1>
+                      <p className="text-center text-slate-400 text-xs font-bold uppercase tracking-widest mb-10">Al-Hikmah Companion</p>
+                      {authError && <div className="bg-red-50 text-red-600 p-3 rounded-xl text-sm mb-4 text-center flex items-center justify-center gap-2"><Info size={16}/>{authError}</div>}
+                      <div className="space-y-4">
+                         <div className="relative group">
+                            <CheckCircle className="absolute left-4 top-1/2 -translate-y-1/2 text-slate-300" size={18}/>
+                            <input type="text" placeholder="Username" value={username} onChange={e=>setUsername(e.target.value)} className="w-full pl-12 p-4 bg-slate-50 border border-slate-200 rounded-xl outline-none focus:ring-2 focus:ring-emerald-500/20" />
+                         </div>
+                         <div className="relative group">
+                            <Lock className="absolute left-4 top-1/2 -translate-y-1/2 text-slate-300" size={18}/>
+                            <input type="password" placeholder="Password" value={password} onChange={e=>setPassword(e.target.value)} className="w-full pl-12 p-4 bg-slate-50 border border-slate-200 rounded-xl outline-none focus:ring-2 focus:ring-emerald-500/20" />
+                         </div>
+                         <button onClick={handleAuth} className="w-full bg-emerald-600 text-white py-4 rounded-xl font-bold hover:bg-emerald-700 transition shadow-lg shadow-emerald-200/50">{isReg ? 'Register' : 'Sign In'}</button>
+                         <button onClick={()=>setIsReg(!isReg)} className="w-full text-slate-500 text-sm hover:text-emerald-600 transition">{isReg ? 'Have account? Login' : 'Create Account'}</button>
+                      </div>
+                   </div>
+                </div>
+            );
+        }
+
+        const Sidebar = () => (
+            <div className={`fixed inset-y-0 right-0 z-50 w-72 bg-white/95 backdrop-blur border-l border-slate-200 shadow-2xl transition-transform duration-300 lg:translate-x-0 ${isMobileMenuOpen ? 'translate-x-0' : 'translate-x-full'}`}>
+                <div className="p-6 flex justify-between items-center border-b border-slate-100">
+                   <div>
+                      <h2 className="font-bold text-emerald-700 font-arabic text-2xl">الحكمة</h2>
+                      <p className="text-[10px] text-slate-400 font-bold uppercase tracking-[0.2em]">Al-Hikmah</p>
+                   </div>
+                   <button onClick={()=>setIsMobileMenuOpen(false)} className="lg:hidden bg-slate-100 p-1 rounded-full text-slate-400"><X size={20}/></button>
+                </div>
+                <div className="p-4 space-y-2">
+                   <SidebarItem icon={Layers} label="Dashboard" active={view === ViewState.DASHBOARD} onClick={()=>{setView(ViewState.DASHBOARD); setIsMobileMenuOpen(false)}} />
+                   <SidebarItem icon={Grid} label="Apps Hub" active={['HUB','QUIZ','ZAKAT','TASBIH','NAMES','DREAM','HALAL','DUA','SALAH','FOODS'].includes(view)} onClick={()=>{setView(ViewState.HUB); setIsMobileMenuOpen(false)}} />
+                   <div className="py-4 px-4 text-[10px] font-bold text-slate-400 uppercase tracking-widest">Library</div>
+                   <SidebarItem icon={BookOpen} label="Read Quran" active={view.startsWith('QURAN')} onClick={()=>{setView(ViewState.QURAN_INDEX); setIsMobileMenuOpen(false)}} />
+                   <SidebarItem icon={MessageCircle} label="Hadith Collection" active={view === ViewState.HADITH} onClick={()=>{setView(ViewState.HADITH); if(!hadiths.length) { setLoadingHadiths(true); GeminiService.getHanafiHadiths('faith').then(d=>{setHadiths(d); setLoadingHadiths(false)}); } setIsMobileMenuOpen(false)}} />
+                   <SidebarItem icon={Hand} label="AI Scholar" active={view === ViewState.SCHOLAR} onClick={()=>{setView(ViewState.SCHOLAR); setIsMobileMenuOpen(false)}} />
+                </div>
+                <div className="absolute bottom-0 w-full p-6 border-t border-slate-100">
+                    <div className="flex items-center gap-3 mb-4">
+                      <div className="w-10 h-10 rounded-xl bg-emerald-600 flex items-center justify-center text-white font-bold shadow-md">
+                        {user?.username[0].toUpperCase()}
+                      </div>
+                      <div className="flex-1 min-w-0">
+                        <p className="text-sm font-bold text-slate-800 truncate">{user?.username}</p>
+                        <div className="flex items-center gap-1">
+                           <div className="w-2 h-2 rounded-full bg-emerald-500"></div>
+                           <p className="text-[10px] text-slate-500 font-medium uppercase">Online</p>
+                        </div>
+                      </div>
+                    </div>
+                    <button onClick={logout} className="flex items-center justify-center gap-2 w-full py-3 rounded-xl text-slate-500 hover:text-red-600 hover:bg-slate-50 text-xs font-bold uppercase tracking-wider transition border border-transparent hover:border-slate-200"><LogOut size={14}/> Sign Out</button>
+                </div>
+            </div>
+        );
+
+        return (
+            <div className="flex min-h-screen bg-[#f8fafc]">
+                <main className="flex-1 lg:mr-72 p-4 sm:p-8 transition-all">
+                    <div className="lg:hidden flex justify-between mb-6 bg-white/80 backdrop-blur p-4 rounded-2xl border border-slate-100 shadow-sm sticky top-0 z-40">
+                        <span className="font-bold text-emerald-800 font-arabic text-xl">الحكمة</span>
+                        <button onClick={()=>setIsMobileMenuOpen(true)}><Menu/></button>
+                    </div>
+
+                    {/* DASHBOARD */}
+                    {view === ViewState.DASHBOARD && (
+                        <div className="max-w-5xl mx-auto space-y-8 animate-in fade-in">
+                            <header className="flex justify-between items-end pb-4 border-b border-slate-200/50">
+                                <div>
+                                    <h1 className="text-3xl font-bold text-slate-800 mb-1">Salam, {user.username}</h1>
+                                    <p className="text-slate-400">Welcome to your spiritual space.</p>
+                                </div>
+                                <div className="hidden sm:block font-arabic text-emerald-600 text-xl">بسم الله الرحمن الرحيم</div>
+                            </header>
+                            
+                            {/* Hero */}
+                            <div className="grid lg:grid-cols-3 gap-6">
+                                <div className="lg:col-span-2 bg-gradient-to-br from-emerald-600 to-emerald-800 rounded-[2rem] p-8 text-white shadow-xl relative overflow-hidden group min-h-[280px] flex flex-col justify-between">
+                                    <div className="absolute inset-0 opacity-10" style={{backgroundImage: 'radial-gradient(#fff 1px, transparent 1px)', backgroundSize: '20px 20px'}}></div>
+                                    <div className="relative z-10">
+                                        <span className="bg-white/20 backdrop-blur px-3 py-1 rounded-full text-xs font-bold uppercase tracking-wider mb-4 inline-flex items-center gap-2"><div className="w-2 h-2 rounded-full bg-emerald-300 animate-pulse"></div>Resume Reading</span>
+                                        <h3 className="text-5xl font-bold font-arabic mb-2">{SURAHS[(user.lastReadSurah||1)-1].name}</h3>
+                                        <p className="text-emerald-100 text-lg">{SURAHS[(user.lastReadSurah||1)-1].englishName}</p>
+                                    </div>
+                                    <div className="relative z-10 mt-8">
+                                       <button onClick={()=>loadSurah(user.lastReadSurah||1)} className="bg-white text-emerald-800 px-8 py-3.5 rounded-xl font-bold flex items-center gap-2 hover:bg-emerald-50 transition shadow-lg"><PlayCircle size={20}/> Continue Ayah {user.lastReadAyah||1}</button>
+                                    </div>
+                                    <BookOpen size={200} className="absolute -right-10 -top-10 opacity-10 rotate-12 group-hover:rotate-0 transition duration-700" />
+                                </div>
+                                
+                                <div className="flex flex-col gap-4">
+                                    <div className="flex-1 bg-white p-6 rounded-[2rem] border border-slate-100 shadow-sm relative overflow-hidden group hover:shadow-md transition flex flex-col justify-between">
+                                        <div>
+                                            <div className="flex justify-between items-center mb-4">
+                                                <h3 className="font-bold text-slate-700 text-xs uppercase tracking-wider">Knowledge</h3>
+                                                <div className="p-2 bg-purple-50 text-purple-500 rounded-lg"><Brain size={20} /></div>
+                                            </div>
+                                            <div className="text-4xl font-bold text-slate-800">{user.quizScore || 0}</div>
+                                            <p className="text-xs text-slate-400 font-medium">Quiz Points</p>
+                                        </div>
+                                        <button onClick={startQuiz} className="w-full py-3 bg-slate-50 text-slate-600 rounded-xl text-sm font-bold hover:bg-purple-50 hover:text-purple-600 transition mt-4">Take Quiz</button>
+                                    </div>
+                                </div>
+                            </div>
+
+                            {/* Mood */}
+                            <div className="bg-gradient-to-r from-indigo-50 to-blue-50 p-8 rounded-[2rem] border border-indigo-100">
+                                <h3 className="text-lg font-bold text-indigo-900 mb-4 flex items-center gap-2"><Sparkles size={18} className="text-indigo-500"/> How is your heart?</h3>
+                                <div className="flex flex-wrap gap-3 mb-6">
+                                    {['Anxious','Grateful','Lost','Sad','Hopeful'].map(m => (
+                                        <button key={m} onClick={()=>handleMood(m)} className="bg-white px-5 py-2.5 rounded-full text-sm font-bold text-slate-600 hover:bg-indigo-500 hover:text-white transition shadow-sm border border-indigo-100">{m}</button>
+                                    ))}
+                                </div>
+                                {moodLoad && <div className="flex items-center gap-2 text-indigo-600 text-sm font-bold"><Loader2 className="animate-spin" size={16}/> Finding comfort...</div>}
+                                {moodRes && <div className="bg-white p-6 rounded-2xl shadow-sm slide-in border border-indigo-50"><p className="text-right font-arabic text-2xl mb-3 text-slate-700">{moodRes.arabic}</p><p className="italic text-slate-600 mb-2">"{moodRes.translation}"</p><p className="text-xs font-bold text-indigo-500 uppercase">{moodRes.ref}</p></div>}
+                            </div>
+
+                            {/* Favorites */}
+                            {user.favorites?.length > 0 && (
+                                <div>
+                                    <h3 className="font-bold text-slate-800 mb-5 flex items-center gap-2 text-lg"><Heart size={18} className="text-rose-500 fill-rose-500"/> Pinned Favorites</h3>
+                                    <div className="flex gap-4 overflow-x-auto pb-4">
+                                        {user.favorites.map(f => {
+                                            const isSurah = f.type === 'surah';
+                                            const label = isSurah ? SURAHS[f.ref-1].englishName : `Ayah ${f.ref.surah}:${f.ref.ayah}`;
+                                            return (
+                                                <button key={f.id} onClick={()=>loadSurah(isSurah ? f.ref : f.ref.surah)} className="min-w-[220px] bg-white p-5 rounded-2xl border border-slate-100 shadow-sm text-left hover:border-rose-200 hover:shadow-md transition group">
+                                                    <div className="flex justify-between items-start mb-3">
+                                                        <span className={`text-[10px] font-bold uppercase px-2 py-1 rounded ${isSurah ? 'bg-emerald-50 text-emerald-600' : 'bg-rose-50 text-rose-600'}`}>{f.type}</span>
+                                                        <Heart size={16} className="text-rose-500 fill-rose-500"/>
+                                                    </div>
+                                                    <p className="font-bold text-slate-700 truncate">{label}</p>
+                                                    {!isSurah && <p className="text-xs text-slate-400 truncate mt-1 font-serif">"{f.ref.text}"</p>}
+                                                </button>
+                                            )
+                                        })}
+                                    </div>
+                                </div>
+                            )}
+                        </div>
+                    )}
+
+                    {/* QURAN INDEX */}
+                    {view === ViewState.QURAN_INDEX && (
+                        <div className="max-w-6xl mx-auto">
+                            <div className="flex flex-col md:flex-row md:items-center gap-6 mb-10">
+                                <div><h2 className="text-3xl font-bold text-slate-800 mb-1">Noble Quran</h2><p className="text-slate-400 font-medium">Index of all 114 Surahs</p></div>
+                                <div className="relative flex-1 max-w-md md:ml-auto">
+                                    <Search className="absolute left-4 top-1/2 -translate-y-1/2 text-slate-400" size={20} />
+                                    <input type="text" placeholder="Search Surah..." className="w-full pl-11 pr-4 py-3.5 rounded-2xl bg-white border border-slate-200 outline-none focus:border-emerald-500 shadow-sm transition" value={searchTerm} onChange={e=>setSearchTerm(e.target.value)} />
+                                </div>
+                            </div>
+                            
+                            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4">
+                                {SURAHS.filter(s => s.englishName.toLowerCase().includes(searchTerm.toLowerCase()) || s.number.toString().includes(searchTerm)).map(s => {
+                                    const pinned = isFavorite('surah', s.number);
+                                    return (
+                                        <button key={s.number} onClick={()=>loadSurah(s.number)} className="bg-white p-5 rounded-2xl shadow-sm border border-slate-100 hover:border-emerald-500 hover:shadow-md transition text-left group relative overflow-hidden">
+                                            <div className="absolute top-0 right-0 w-20 h-20 bg-emerald-50/50 rounded-bl-[3rem] -mr-6 -mt-6 transition-all group-hover:bg-emerald-100/80"></div>
+                                            <div className="flex items-center gap-4 z-10 relative">
+                                                <div className="w-10 h-10 rounded-xl bg-slate-50 flex items-center justify-center font-bold text-sm text-slate-400 group-hover:bg-emerald-600 group-hover:text-white transition border border-slate-100">{s.number}</div>
+                                                <div><h3 className="font-bold text-slate-800 leading-tight">{s.englishName}</h3><p className="text-[10px] text-slate-400 uppercase font-bold tracking-wide">{s.revelationType} • {s.numberOfAyahs}</p></div>
+                                            </div>
+                                            <div className="absolute bottom-5 right-5 z-20">
+                                                <div onClick={(e)=>{e.stopPropagation(); toggleFav('surah', s.number)}} className={`cursor-pointer transition ${pinned ? 'text-rose-500' : 'text-slate-200 hover:text-rose-300'}`}><Heart size={18} fill={pinned?"currentColor":"none"}/></div>
+                                            </div>
+                                        </button>
+                                    )
+                                })}
+                            </div>
+                        </div>
+                    )}
+
+                    {/* QURAN READ */}
+                    {view === ViewState.QURAN_READ && (
+                        <div className="max-w-4xl mx-auto">
+                            <div className="sticky top-0 z-30 bg-[#f8fafc]/95 backdrop-blur-md border-b border-slate-200/50 mb-8 -mx-4 sm:-mx-6 lg:-mx-10 px-4 sm:px-6 lg:px-10 py-4 flex items-center justify-between">
+                                <button onClick={()=>setView(ViewState.QURAN_INDEX)} className="p-2 -ml-2 rounded-full bg-white hover:bg-slate-100 text-slate-500 transition shadow-sm border border-slate-100"><ArrowLeft size={20}/></button>
+                                <div className="text-center"><h2 className="font-bold text-slate-800">{SURAHS[currentSurah-1].englishName}</h2></div>
+                                <div className="w-10"></div>
+                            </div>
+
+                            <div className="bg-white rounded-[2.5rem] p-8 sm:p-12 shadow-sm border border-slate-100 min-h-[80vh]">
+                                {currentSurah!==9 && <div className="text-center mb-16 mt-4"><p className="font-arabic text-4xl sm:text-5xl text-slate-800 leading-relaxed opacity-80">{BISMILLAH}</p></div>}
+                                {loadingAyahs ? <Loading/> : ayahs.map((a,i) => {
+                                    const pinned = isFavorite('ayah', {surah: currentSurah, ayah: a.numberInSurah});
+                                    return (
+                                    <div key={a.numberInSurah}>
+                                        <div className="group relative py-6 transition-colors hover:bg-slate-50/50 rounded-3xl px-4 -mx-4">
+                                            <div className="absolute top-6 left-4 opacity-0 group-hover:opacity-100 transition-opacity flex gap-2">
+                                                <button onClick={()=>{setTafsirOpen(tafsirOpen===a.numberInSurah?null:a.numberInSurah); if(tafsirOpen!==a.numberInSurah){setTafsirTxt(''); GeminiService.getTafsir(currentSurah, a.numberInSurah).then(setTafsirTxt)}}} className={`p-2 rounded-full border shadow-sm ${tafsirOpen===a.numberInSurah ? 'bg-amber-100 text-amber-700 border-amber-200' : 'bg-white text-slate-400 border-slate-200 hover:text-amber-600'}`}><BookOpen size={16}/></button>
+                                                <button onClick={()=>toggleFav('ayah', {surah:currentSurah, ayah:a.numberInSurah, text: a.translation})} className={`p-2 rounded-full border shadow-sm ${pinned ? 'bg-rose-50 text-rose-500 border-rose-200' : 'bg-white text-slate-400 border-slate-200 hover:text-rose-500'}`}><Heart size={16} fill={pinned?"currentColor":"none"}/></button>
+                                                <span className="w-8 h-8 rounded-full bg-emerald-50 text-emerald-700 border border-emerald-100 flex items-center justify-center text-xs font-bold">{a.numberInSurah}</span>
+                                            </div>
+                                            <div className="space-y-8 pl-0 sm:pl-12">
+                                                <p className="text-right font-arabic text-4xl sm:text-5xl leading-[2.3] text-slate-800" dir="rtl">{a.text}</p>
+                                                <div className="space-y-2">
+                                                    <p className="text-slate-700 text-lg sm:text-xl font-serif leading-relaxed">{a.translation}</p>
+                                                    <p className="text-slate-400 text-sm italic">{a.transliteration}</p>
+                                                </div>
+                                            </div>
+                                            {tafsirOpen === a.numberInSurah && (
+                                                <div className="mt-8 ml-0 sm:ml-12 bg-amber-50 p-6 rounded-2xl border border-amber-100 slide-in">
+                                                    <div className="flex items-center gap-2 mb-3 text-amber-800 font-bold border-b border-amber-200/50 pb-2"><Book size={18}/> Tafsir</div>
+                                                    <p className="text-amber-900 leading-loose text-base text-justify">{tafsirTxt || <span className="flex items-center gap-2"><Loader2 className="animate-spin" size={14}/> Loading...</span>}</p>
+                                                </div>
+                                            )}
+                                        </div>
+                                        {i < ayahs.length - 1 && <div className="ornament-divider"><span className="text-emerald-200 text-xl">۞</span></div>}
+                                    </div>
+                                )})}
+                            </div>
+                        </div>
+                    )}
+
+                    {/* SCHOLAR */}
+                    {view === ViewState.SCHOLAR && (
+                        <div className="max-w-4xl mx-auto h-[calc(100vh-8rem)] flex flex-col bg-white rounded-[2.5rem] shadow-xl border border-slate-100 overflow-hidden">
+                            <div className="p-6 border-b border-slate-100 bg-slate-50/50 flex items-center gap-4">
+                                <div className="w-12 h-12 rounded-2xl bg-gradient-to-br from-emerald-500 to-teal-600 flex items-center justify-center text-white shadow-md"><Hand size={24}/></div>
+                                <div><h2 className="font-bold text-slate-800 text-lg">AI Scholar (Hanafi)</h2><p className="text-xs text-emerald-600 font-bold uppercase tracking-wide">Online & Ready</p></div>
+                            </div>
+                            <div className="flex-1 overflow-y-auto p-6 space-y-8">
+                                {chatHistory.length === 0 && (
+                                    <div className="text-center text-slate-400 mt-20 max-w-sm mx-auto">
+                                        <div className="w-20 h-20 bg-emerald-50 rounded-full flex items-center justify-center mx-auto mb-6"><Sparkles size={32} className="text-emerald-300"/></div>
+                                        <h3 className="text-slate-700 font-bold mb-2">How can I help you?</h3>
+                                        <div className="grid gap-3 mt-6">
+                                            <button onClick={()=>setChatInput("Is seafood halal?")} className="text-xs font-medium bg-white border border-slate-200 p-4 rounded-xl hover:border-emerald-400 hover:text-emerald-600 transition text-left">"Is seafood halal?"</button>
+                                            <button onClick={()=>setChatInput("Conditions of Wudu")} className="text-xs font-medium bg-white border border-slate-200 p-4 rounded-xl hover:border-emerald-400 hover:text-emerald-600 transition text-left">"Conditions of Wudu"</button>
+                                        </div>
+                                    </div>
+                                )}
+                                {chatHistory.map((m,i)=>(
+                                    <div key={i} className={`flex ${m.role==='user'?'justify-end':'justify-start'} slide-in`}>
+                                        {m.role==='model' && <div className="w-8 h-8 rounded-full bg-emerald-100 flex-shrink-0 flex items-center justify-center text-emerald-700 mr-3 mt-2"><Hand size={14}/></div>}
+                                        <div className={`max-w-[85%] p-5 rounded-2xl shadow-sm ${m.role==='user'?'bg-emerald-600 text-white rounded-tr-none':'bg-slate-50 text-slate-700 border border-slate-100 rounded-tl-none'}`}>
+                                            {m.role==='model' ? <div className="prose prose-sm prose-emerald max-w-none"><FormattedResponse text={m.text}/></div> : <p className="leading-relaxed font-medium">{m.text}</p>}
+                                        </div>
+                                    </div>
+                                ))}
+                                {isChatLoading && <div className="flex ml-11"><div className="bg-white border border-slate-100 px-4 py-3 rounded-2xl rounded-tl-none flex items-center gap-2 text-slate-500 text-sm shadow-sm"><Loader2 className="animate-spin text-emerald-500" size={16}/> Thinking...</div></div>}
+                                <div ref={chatEndRef}/>
+                            </div>
+                            <div className="p-4 bg-white border-t border-slate-100 flex gap-3">
+                                <input value={chatInput} onChange={e=>setChatInput(e.target.value)} onKeyDown={e=>e.key==='Enter'&&handleScholarChat()} placeholder="Type your question..." className="flex-1 px-5 py-4 rounded-2xl bg-slate-50 border border-slate-200 outline-none focus:ring-2 focus:ring-emerald-500/20 transition font-medium" />
+                                <button onClick={handleScholarChat} disabled={isChatLoading||!chatInput.trim()} className="bg-emerald-600 text-white p-4 rounded-2xl hover:bg-emerald-700 transition shadow-lg shadow-emerald-200 disabled:opacity-50"><Send size={22}/></button>
+                            </div>
+                        </div>
+                    )}
+
+                    {view === ViewState.HUB && (
+                        <div className="max-w-6xl mx-auto animate-in fade-in">
+                            <header className="mb-10"><h2 className="text-3xl font-bold text-slate-800 mb-2">Apps Hub</h2><p className="text-slate-500">Tools for your daily spiritual life.</p></header>
+                            <div className="space-y-10">
+                                <section>
+                                    <h3 className="text-xs font-bold text-slate-400 uppercase tracking-widest mb-6 flex items-center gap-2 ml-1"><Layers size={16}/> Worship Tools</h3>
+                                    <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-4 gap-5">
+                                        <AppGridItem icon={AlignLeft} label="Salah Guide" description="Step-by-step" color="bg-green-500" onClick={()=>setView(ViewState.SALAH)} />
+                                        <AppGridItem icon={Coffee} label="Daily Dua" description="Fortress of Muslim" color="bg-blue-500" onClick={()=>setView(ViewState.DUA)} />
+                                        <AppGridItem icon={Compass} label="Tasbih" description="Dhikr Counter" color="bg-teal-500" onClick={()=>setView(ViewState.TASBIH)} />
+                                        <AppGridItem icon={Calculator} label="Zakat Calc" description="Wealth Check" color="bg-amber-500" onClick={()=>setView(ViewState.ZAKAT)} />
+                                    </div>
+                                </section>
+                                <section>
+                                    <h3 className="text-xs font-bold text-slate-400 uppercase tracking-widest mb-6 flex items-center gap-2 ml-1"><BookOpen size={16}/> Knowledge</h3>
+                                    <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-4 gap-5">
+                                        <AppGridItem icon={Brain} label="Islamic Quiz" description="Test yourself" color="bg-purple-500" onClick={startQuiz} />
+                                        <AppGridItem icon={Heart} label="99 Names" description="Asma ul Husna" color="bg-pink-500" onClick={()=>setView(ViewState.NAMES)} />
+                                    </div>
+                                </section>
+                                <section>
+                                    <h3 className="text-xs font-bold text-slate-400 uppercase tracking-widest mb-6 flex items-center gap-2 ml-1"><Sparkles size={16}/> Lifestyle</h3>
+                                    <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-4 gap-5">
+                                        <AppGridItem icon={Moon} label="Dreams" description="Interpretation" color="bg-indigo-500" onClick={()=>setView(ViewState.DREAM)} />
+                                        <AppGridItem icon={Utensils} label="Halal Check" description="Scan ingredients" color="bg-rose-500" onClick={()=>setView(ViewState.HALAL)} />
+                                        <AppGridItem icon={Utensils} label="Sunnah Foods" description="Prophetic Diet" color="bg-orange-500" onClick={()=>setView(ViewState.FOODS)} />
+                                    </div>
+                                </section>
+                            </div>
+                        </div>
+                    )}
+
+                    {/* QUIZ VIEW */}
+                    {view === ViewState.QUIZ && (
+                        <div className="max-w-2xl mx-auto pt-8">
+                            <button onClick={()=>setView(ViewState.HUB)} className="mb-6 text-slate-400 hover:text-slate-800 flex items-center gap-2 text-sm font-bold bg-white px-4 py-2 rounded-full shadow-sm"><ArrowLeft size={16}/> Back</button>
+                            {isChatLoading ? <Loading/> : quizQ.length > 0 && (
+                                <div className="bg-white rounded-[2.5rem] shadow-xl border border-slate-100 overflow-hidden">
+                                    <div className="bg-purple-600 p-10 text-white text-center relative"><div className="absolute inset-0 bg-purple-900/20"></div><div className="relative z-10"><div className="flex justify-between mb-6 opacity-90 text-xs font-bold uppercase"><span>Q {quizIdx+1}/{quizQ.length}</span><span className="bg-white/20 px-3 py-1 rounded-full">Score: {quizScore}</span></div><h2 className="text-2xl font-bold">{quizQ[quizIdx].question}</h2></div></div>
+                                    <div className="p-8 space-y-3">
+                                        {quizQ[quizIdx].options.map((o,i) => {
+                                            let cls = "w-full p-5 rounded-2xl border-2 text-left transition-all font-medium flex items-center justify-between ";
+                                            if(quizState.answered) {
+                                                if(i===quizQ[quizIdx].correctAnswer) cls += "border-green-500 bg-green-50 text-green-700";
+                                                else if(i===quizState.sel) cls += "border-red-500 bg-red-50 text-red-700";
+                                                else cls += "border-slate-100 opacity-50";
+                                            } else cls += "border-slate-100 hover:border-purple-500 hover:bg-purple-50";
+                                            return <button key={i} disabled={quizState.answered} onClick={()=>handleQuizAns(i)} className={cls}>{o}</button>
+                                        })}
+                                        {quizState.answered && <div className="mt-8 pt-6 border-t border-slate-100 slide-in"><p className="font-bold text-slate-800 mb-1">Explanation</p><p className="text-slate-600 text-sm mb-4">{quizQ[quizIdx].explanation}</p><button onClick={nextQuiz} className="w-full bg-purple-600 text-white font-bold py-4 rounded-xl hover:bg-purple-700 shadow-lg shadow-purple-200">Next</button></div>}
+                                    </div>
+                                </div>
+                            )}
+                        </div>
+                    )}
+
+                    {/* HADITH VIEW */}
+                    {view === ViewState.HADITH && (
+                        <div className="max-w-5xl mx-auto">
+                             <div className="flex flex-col sm:flex-row justify-between items-end mb-10 gap-4">
+                               <div><h2 className="text-3xl font-bold text-slate-800 mb-2">Hadith Collection</h2><p className="text-slate-500">Authentic Sunni Narrations</p></div>
+                               <div className="flex items-center gap-2 bg-white p-1 pr-4 rounded-xl border border-slate-200 shadow-sm"><div className="bg-emerald-100 text-emerald-700 p-2 rounded-lg"><Layers size={18}/></div><select value={hadithTopic} onChange={e=>setHadithTopic(e.target.value)} className="bg-transparent outline-none text-sm font-bold text-slate-700"><option value="faith">Faith</option><option value="prayer">Prayer</option><option value="charity">Charity</option><option value="manners">Manners</option></select></div>
+                             </div>
+                             <div className="grid gap-6">
+                               {loadingHadiths ? <Loading/> : hadiths.map(h => (
+                                   <div key={h.id} className="bg-white p-8 rounded-3xl shadow-sm border border-slate-100 hover:shadow-md transition"><div className="flex justify-between mb-6"><span className="bg-emerald-50 text-emerald-700 px-3 py-1.5 rounded-lg text-xs font-bold uppercase border border-emerald-100">{h.source}</span><span className="text-slate-400 text-xs font-medium bg-slate-50 px-2 py-1 rounded">{h.grade}</span></div><p className="text-right font-arabic text-2xl sm:text-3xl mb-6 text-slate-700 leading-loose" dir="rtl">{h.arabic}</p><div className="pl-4 border-l-4 border-emerald-500/20"><p className="text-slate-800 text-lg font-medium italic">"{h.english}"</p></div><p className="text-slate-400 text-sm mt-4 font-medium flex items-center gap-2"><span className="w-6 h-[1px] bg-slate-300"></span> Narrated by {h.narrator}</p></div>
+                               ))}
+                               {hadiths.length===0 && !loadingHadiths && <div className="text-center py-20"><button onClick={loadHadiths} className="bg-emerald-600 text-white px-6 py-3 rounded-xl font-bold">Load Hadiths</button></div>}
+                               {hadiths.length>0 && <button onClick={loadHadiths} className="w-full py-4 bg-white border border-slate-200 text-emerald-700 rounded-2xl font-bold mt-6 hover:bg-emerald-50">Load More</button>}
+                             </div>
+                        </div>
+                    )}
+
+                    {/* ZAKAT, TASBIH, NAMES, DUA, SALAH, FOODS, DREAM, HALAL - Simplified implementations matching full logic */}
+                    {view === ViewState.ZAKAT && (
+                        <div className="max-w-xl mx-auto mt-10 bg-white p-10 rounded-[2.5rem] shadow-xl border border-slate-100 relative">
+                             <button onClick={()=>setView(ViewState.HUB)} className="absolute top-10 left-10 text-slate-400"><ArrowLeft/></button>
+                             <div className="text-center mb-10"><div className="w-16 h-16 bg-amber-100 text-amber-600 rounded-2xl flex items-center justify-center mx-auto mb-4"><Calculator size={32}/></div><h2 className="text-3xl font-bold text-slate-800">Zakat Calculator</h2></div>
+                             <input type="number" value={zakatAssets} onChange={e=>setZakatAssets(e.target.value)} placeholder="Total Wealth ($)" className="w-full p-4 bg-slate-50 rounded-xl border border-slate-200 mb-4 outline-none focus:border-amber-500"/>
+                             <button onClick={calcZakat} className="w-full bg-amber-500 text-white py-4 rounded-xl font-bold shadow-lg shadow-amber-200 mb-8">Calculate</button>
+                             {zakatRes && <div className={`p-6 rounded-2xl text-center ${zakatRes.eligible?'bg-green-50 text-green-800':'bg-slate-50 text-slate-500'}`}><p className="text-4xl font-bold mb-2">${zakatRes.amount.toFixed(2)}</p><p className="text-xs font-bold uppercase">{zakatRes.eligible?'Zakat Due':'Not Eligible'}</p></div>}
+                        </div>
+                    )}
+
+                    {view === ViewState.TASBIH && (
+                        <div className="max-w-md mx-auto text-center pt-20">
+                            <button onClick={()=>setView(ViewState.HUB)} className="mb-10 bg-white p-2 rounded-full shadow-sm"><ArrowLeft/></button>
+                            <div onClick={incrementTasbih} className="w-72 h-72 bg-white rounded-full mx-auto flex flex-col items-center justify-center shadow-2xl border-8 border-slate-50 active:scale-95 transition cursor-pointer select-none"><span className="text-8xl font-bold text-teal-600">{tasbihCount}</span><span className="text-xs font-bold text-teal-400 uppercase tracking-widest mt-2">Dhikr</span></div>
+                            <button onClick={()=>{setTasbihCount(0); updateUserInDb({...user, tasbihCount:0})}} className="mt-10 text-slate-400 font-bold uppercase text-xs hover:text-red-500">Reset</button>
+                        </div>
+                    )}
+
+                    {view === ViewState.DREAM && (
+                        <div className="max-w-2xl mx-auto mt-10 bg-white p-10 rounded-[2.5rem] shadow-xl border border-slate-100">
+                            <button onClick={()=>setView(ViewState.HUB)} className="mb-6 text-slate-400"><ArrowLeft/></button>
+                            <div className="text-center mb-8"><div className="w-16 h-16 bg-indigo-50 rounded-full flex items-center justify-center mx-auto mb-4 text-indigo-500"><Moon size={32}/></div><h2 className="text-3xl font-bold text-indigo-900">Dream Interpretation</h2></div>
+                            <textarea value={dreamIn} onChange={e=>setDreamIn(e.target.value)} className="w-full p-5 bg-slate-50 rounded-2xl border border-slate-200 h-32 mb-4 outline-none focus:border-indigo-500" placeholder="Describe your dream..."/>
+                            <button onClick={()=>{setDreamRes(''); setIsChatLoading(true); GeminiService.interpretDream(dreamIn).then(r=>{setDreamRes(r); setIsChatLoading(false)})}} disabled={isChatLoading} className="w-full bg-indigo-600 text-white py-4 rounded-xl font-bold shadow-lg shadow-indigo-200 mb-6">Interpret</button>
+                            {isChatLoading && <Loader2 className="animate-spin mx-auto text-indigo-500"/>}
+                            {dreamRes && <div className="bg-indigo-50 p-6 rounded-2xl text-indigo-900 slide-in"><FormattedResponse text={dreamRes}/></div>}
+                        </div>
+                    )}
+
+                    {view === ViewState.HALAL && (
+                        <div className="max-w-2xl mx-auto mt-10 bg-white p-10 rounded-[2.5rem] shadow-xl border border-slate-100">
+                            <button onClick={()=>setView(ViewState.HUB)} className="mb-6 text-slate-400"><ArrowLeft/></button>
+                            <div className="text-center mb-8"><div className="w-16 h-16 bg-rose-50 rounded-full flex items-center justify-center mx-auto mb-4 text-rose-500"><Search size={32}/></div><h2 className="text-3xl font-bold text-rose-800">Halal Scanner</h2></div>
+                            <div className="flex gap-3 mb-6"><input value={halalIn} onChange={e=>setHalalIn(e.target.value)} className="flex-1 p-4 bg-slate-50 rounded-xl border border-slate-200 outline-none focus:border-rose-500" placeholder="E120, Gelatin..."/><button onClick={()=>{setHalalRes(''); setIsChatLoading(true); GeminiService.checkHalalStatus(halalIn).then(r=>{setHalalRes(r); setIsChatLoading(false)})}} className="bg-rose-600 text-white px-6 rounded-xl font-bold shadow-lg shadow-rose-200">Check</button></div>
+                            {isChatLoading && <Loader2 className="animate-spin mx-auto text-rose-500"/>}
+                            {halalRes && <div className="p-6 bg-slate-50 rounded-2xl slide-in"><FormattedResponse text={halalRes}/></div>}
+                        </div>
+                    )}
+                    
+                    {view === ViewState.NAMES && (
+                        <div className="max-w-5xl mx-auto">
+                            <button onClick={()=>setView(ViewState.HUB)} className="mb-6 bg-white p-2 rounded-full shadow-sm"><ArrowLeft/></button>
+                            <div className="grid grid-cols-2 sm:grid-cols-5 gap-4">{ALLAH_NAMES.map((n,i)=>(<div key={i} className="bg-white p-6 rounded-2xl shadow-sm text-center border border-slate-100 hover:shadow-md"><div className="w-8 h-8 rounded-full bg-pink-50 text-pink-400 text-xs font-bold flex items-center justify-center mx-auto mb-3">{i+1}</div><h3 className="font-bold text-slate-800 mb-1">{n.name}</h3><p className="text-pink-500 text-xs">{n.meaning}</p></div>))}</div>
+                        </div>
+                    )}
+
+                    {view === ViewState.DUA && (
+                        <div className="max-w-3xl mx-auto">
+                             <button onClick={()=>setView(ViewState.HUB)} className="mb-6 bg-white p-2 rounded-full shadow-sm"><ArrowLeft/></button>
+                             {DUAS_DATA.map((c,i)=>(<div key={i} className="mb-8"><h3 className="text-xs font-bold uppercase tracking-widest text-slate-400 mb-4 flex items-center gap-2"><div className="h-[1px] bg-slate-200 flex-1"></div>{c.category}<div className="h-[1px] bg-slate-200 flex-1"></div></h3><div className="space-y-4">{c.items.map((d,j)=>(<div key={j} className="bg-white p-8 rounded-[2rem] shadow-sm relative overflow-hidden"><p className="font-arabic text-2xl text-right mb-4 leading-loose text-slate-700">{d.arabic}</p><p className="text-slate-800 font-medium mb-2">"{d.translation}"</p><p className="text-xs text-slate-400 italic">{d.transliteration}</p></div>))}</div></div>))}
+                        </div>
+                    )}
+
+                    {view === ViewState.SALAH && (
+                        <div className="max-w-4xl mx-auto">
+                            <button onClick={()=>setView(ViewState.HUB)} className="mb-6 bg-white p-2 rounded-full shadow-sm"><ArrowLeft/></button>
+                            <div className="grid md:grid-cols-2 gap-6">{SALAH_STEPS.map(s=>(<div key={s.step} className="bg-white p-6 rounded-3xl shadow-sm border border-slate-100 flex gap-4 items-start"><div className="w-12 h-12 rounded-2xl bg-green-50 text-green-600 flex items-center justify-center font-bold text-xl shrink-0">{s.step}</div><div><h3 className="font-bold text-slate-800 text-lg mb-1">{s.title}</h3><p className="text-slate-600 text-sm">{s.desc}</p></div></div>))}</div>
+                        </div>
+                    )}
+                    
+                    {view === ViewState.FOODS && (
+                        <div className="max-w-5xl mx-auto">
+                            <button onClick={()=>setView(ViewState.HUB)} className="mb-6 bg-white p-2 rounded-full shadow-sm"><ArrowLeft/></button>
+                            <div className="grid md:grid-cols-3 gap-6">{SUNNAH_FOODS_DATA.map((f,i)=>(<div key={i} className="bg-white p-6 rounded-3xl shadow-sm border border-slate-100 hover:shadow-lg transition"><div className="flex justify-between mb-4"><h3 className="font-bold text-slate-800 text-lg">{f.name}</h3><Utensils size={18} className="text-orange-400"/></div><p className="text-sm text-slate-600 mb-4 leading-relaxed">{f.benefit}</p><span className="text-[10px] font-bold bg-slate-50 px-2 py-1 rounded uppercase text-slate-400 border border-slate-100">{f.ref}</span></div>))}</div>
+                        </div>
+                    )}
+
+                </main>
+                <Sidebar />
+            </div>
+        );
+      };
+
+      const root = createRoot(document.getElementById('root'));
+      root.render(<App />);
+    </script>
+</body>
 </html>
