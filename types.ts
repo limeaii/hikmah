@@ -26,10 +26,18 @@ export interface UserProfile {
   lastReadSurah: number;
   lastReadAyah: number;
   bookmarks: Bookmark[];
+  favorites: FavoriteItem[]; // New: Pinned items
   tasbihCount: number;
   theme: 'light' | 'dark';
   fontSize: number;
   quizScore: number;
+}
+
+export interface FavoriteItem {
+  id: string;
+  type: 'surah' | 'ayah';
+  ref: number | { surah: number; ayah: number; text?: string }; // number for surah, object for ayah
+  timestamp: number;
 }
 
 export interface Bookmark {

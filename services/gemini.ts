@@ -181,6 +181,24 @@ export const getTafsir = async (surah: number, ayah: number): Promise<string> =>
 
 // --- New Features ---
 
+export const getAyahByMood = async (mood: string): Promise<{arabic: string, translation: string, ref: string}> => {
+    if (!apiKey) return { arabic: "", translation: "Service unavailable", ref: "" };
+    try {
+        const prompt = `
+          Find ONE Quranic verse that brings comfort to someone feeling: "${mood}".
+          Return valid JSON: { "arabic": "text", "translation": "text", "ref": "Surah:Ayah" }
+        `;
+        const response = await ai.models.generateContent({
+            model: fastModel,
+            contents: prompt,
+            config: { responseMimeType: "application/json" }
+        });
+        return JSON.parse(response.text || '{}');
+    } catch (e) {
+        return { arabic: "", translation: "Please try again later.", ref: "" };
+    }
+}
+
 export const getIslamicQuiz = async (): Promise<QuizQuestion[]> => {
   if (!apiKey) return [];
   try {

@@ -7,9 +7,9 @@ import {
   Bookmark as BookmarkIcon, Loader2, Grid, Lock, 
   Moon, Sun, CheckCircle, Utensils, Brain, Info, 
   ArrowLeft, Send, Share2, Coffee, AlignLeft, Book,
-  Star, Layers, Sparkles
+  Star, Layers, Sparkles, Smile, Frown, Meh, Zap, CloudRain
 } from 'lucide-react';
-import { ViewState, UserProfile, Ayah, Hadith, QuizQuestion, SurahMetadata } from './types';
+import { ViewState, UserProfile, Ayah, Hadith, QuizQuestion, SurahMetadata, FavoriteItem } from './types';
 import { SURAHS, ALLAH_NAMES, ZAKAT_THRESHOLD_GOLD_GRAMS, DUAS_DATA, SALAH_STEPS, SUNNAH_FOODS_DATA } from './constants';
 import * as GeminiService from './services/gemini';
 
@@ -21,15 +21,15 @@ const BISMILLAH = "بِسْمِ ٱللَّهِ ٱلرَّحْمَٰنِ ٱلرّ
 const SidebarItem = ({ icon: Icon, label, active, onClick }: any) => (
   <button
     onClick={onClick}
-    className={`w-full flex items-center gap-3 px-4 py-3.5 rounded-xl transition-all duration-200 group ${
+    className={`w-full flex items-center gap-3 px-4 py-3 rounded-xl transition-all duration-200 group ${
       active 
-        ? 'bg-emerald-50 text-emerald-700 font-semibold shadow-sm ring-1 ring-emerald-100' 
-        : 'text-slate-500 hover:bg-white hover:text-slate-800 hover:shadow-sm'
+        ? 'bg-emerald-50 text-emerald-700 font-bold shadow-sm ring-1 ring-emerald-100' 
+        : 'text-slate-500 hover:bg-slate-50 hover:text-slate-800'
     }`}
   >
-    <Icon size={20} className={`transition-colors ${active ? 'text-emerald-600' : 'text-slate-400 group-hover:text-slate-600'}`} />
+    <Icon size={18} className={`transition-colors ${active ? 'text-emerald-600' : 'text-slate-400 group-hover:text-emerald-600'}`} />
     <span className="text-sm">{label}</span>
-    {active && <ChevronRight size={16} className="ml-auto opacity-50" />}
+    {active && <div className="ml-auto w-1.5 h-1.5 rounded-full bg-emerald-500"></div>}
   </button>
 );
 
@@ -40,18 +40,6 @@ const Loading = () => (
       <Loader2 className="animate-spin text-emerald-600 relative z-10" size={48} />
     </div>
     <p className="text-slate-400 text-sm font-medium animate-pulse">Consulting the knowledge...</p>
-  </div>
-);
-
-const StatCard = ({ label, value, icon: Icon, colorClass }: any) => (
-  <div className="bg-white p-5 rounded-2xl border border-slate-100 shadow-sm flex items-center gap-4">
-    <div className={`w-12 h-12 rounded-full flex items-center justify-center ${colorClass} bg-opacity-10`}>
-      <Icon className={colorClass.replace('bg-', 'text-')} size={24} />
-    </div>
-    <div>
-      <p className="text-slate-400 text-xs font-bold uppercase tracking-wider">{label}</p>
-      <p className="text-xl font-bold text-slate-800">{value}</p>
-    </div>
   </div>
 );
 
@@ -102,6 +90,10 @@ const App = () => {
   const [goldPrice, setGoldPrice] = useState('65'); // Approx USD per gram
   const [zakatResult, setZakatResult] = useState<{eligible: boolean, amount: number, nisaab: number} | null>(null);
 
+  // Mood Feature State
+  const [moodResult, setMoodResult] = useState<{arabic: string, translation: string, ref: string} | null>(null);
+  const [moodLoading, setMoodLoading] = useState(false);
+
   const chatEndRef = useRef<HTMLDivElement>(null);
 
   // Initialize Session
@@ -151,6 +143,7 @@ const App = () => {
         lastReadSurah: 1,
         lastReadAyah: 1,
         bookmarks: [],
+        favorites: [],
         tasbihCount: 0,
         theme: 'light',
         fontSize: 18,
@@ -167,6 +160,8 @@ const App = () => {
         setAuthLoading(false);
         return;
       }
+      // Backwards compatibility for old users without favorites
+      if (!existingUser.favorites) existingUser.favorites = [];
       loginUser(existingUser);
     }
   };
@@ -185,6 +180,70 @@ const App = () => {
     setUsernameInput('');
     setPasswordInput('');
   };
+
+  // --- Favorites Logic ---
+
+  const isFavorite = (type: 'surah' | 'ayah', id: number) => {
+    if (!user || !user.favorites) return false;
+    if (type === 'surah') {
+        return user.favorites.some(f => f.type === 'surah' && f.ref === id);
+    } else {
+        // for ayahs, we check composite key usually, but here simplified logic
+        return user.favorites.some(f => f.type === 'ayah' && typeof f.ref === 'object' && f.ref.surah === currentSurah && f.ref.ayah === id);
+    }
+  };
+
+  const toggleFavoriteSurah = (surahNum: number, e: React.MouseEvent) => {
+    e.stopPropagation(); // Prevent card click
+    if (!user) return;
+
+    const exists = isFavorite('surah', surahNum);
+    let newFavorites = [...(user.favorites || [])];
+
+    if (exists) {
+        newFavorites = newFavorites.filter(f => !(f.type === 'surah' && f.ref === surahNum));
+    } else {
+        newFavorites.push({
+            id: Date.now().toString(),
+            type: 'surah',
+            ref: surahNum,
+            timestamp: Date.now()
+        });
+    }
+    
+    const updated = { ...user, favorites: newFavorites };
+    setUser(updated);
+    updateUserInDb(updated);
+  };
+
+  const toggleFavoriteAyah = (ayahNum: number, text: string) => {
+      if (!user) return;
+      const exists = isFavorite('ayah', ayahNum);
+      let newFavorites = [...(user.favorites || [])];
+
+      if (exists) {
+          newFavorites = newFavorites.filter(f => !(f.type === 'ayah' && typeof f.ref === 'object' && f.ref.surah === currentSurah && f.ref.ayah === ayahNum));
+      } else {
+          newFavorites.push({
+              id: Date.now().toString(),
+              type: 'ayah',
+              ref: { surah: currentSurah, ayah: ayahNum, text: text.substring(0, 50) + '...' }, // Store snippet
+              timestamp: Date.now()
+          });
+      }
+      
+      const updated = { ...user, favorites: newFavorites };
+      setUser(updated);
+      updateUserInDb(updated);
+  };
+
+  const handleMoodCheck = async (mood: string) => {
+      setMoodLoading(true);
+      setMoodResult(null);
+      const result = await GeminiService.getAyahByMood(mood);
+      setMoodResult(result);
+      setMoodLoading(false);
+  }
 
   // --- Feature Functions ---
 
@@ -322,18 +381,18 @@ const App = () => {
   // --- Render Components ---
 
   const Sidebar = () => (
-    <div className={`fixed inset-y-0 left-0 z-50 w-72 bg-white/95 backdrop-blur-md border-r border-slate-200 shadow-xl transform transition-transform duration-300 ease-in-out lg:translate-x-0 ${isMobileMenuOpen ? 'translate-x-0' : '-translate-x-full'}`}>
-      <div className="p-8 flex justify-between items-center">
+    <div className={`fixed inset-y-0 right-0 z-50 w-72 bg-white/90 backdrop-blur-xl border-l border-slate-200 shadow-[-10px_0_40px_-10px_rgba(0,0,0,0.1)] transform transition-transform duration-300 ease-out lg:translate-x-0 overflow-y-auto ${isMobileMenuOpen ? 'translate-x-0' : 'translate-x-full'}`}>
+      <div className="p-8 flex justify-between items-center border-b border-slate-100/50">
         <div>
-          <h2 className="text-3xl font-bold text-emerald-700 font-arabic leading-none mb-1">الحكمة</h2>
+          <h2 className="text-3xl font-bold text-emerald-700 font-arabic leading-none mb-1 drop-shadow-sm">الحكمة</h2>
           <p className="text-slate-400 text-[10px] font-bold uppercase tracking-[0.2em]">Al-Hikmah</p>
         </div>
-        <button onClick={() => setIsMobileMenuOpen(false)} className="lg:hidden text-slate-400 hover:text-slate-600">
-          <X size={24} />
+        <button onClick={() => setIsMobileMenuOpen(false)} className="lg:hidden text-slate-400 hover:text-slate-600 bg-slate-100 rounded-full p-1">
+          <X size={20} />
         </button>
       </div>
       
-      <div className="px-4 space-y-1.5">
+      <div className="px-4 py-6 space-y-1.5">
         <SidebarItem icon={Layers} label="Dashboard" active={view === ViewState.DASHBOARD} onClick={() => { setView(ViewState.DASHBOARD); setIsMobileMenuOpen(false); }} />
         <SidebarItem icon={Grid} label="Apps Hub" active={
           view === ViewState.HUB || 
@@ -348,36 +407,39 @@ const App = () => {
           view === ViewState.FOODS
         } onClick={() => { setView(ViewState.HUB); setIsMobileMenuOpen(false); }} />
         
-        <div className="pt-6 pb-3 px-4 text-[11px] font-bold text-slate-400 uppercase tracking-widest opacity-80">Knowledge</div>
+        <div className="pt-6 pb-3 px-4 text-[11px] font-extrabold text-slate-400 uppercase tracking-widest opacity-60">Library</div>
         <SidebarItem icon={BookOpen} label="Read Quran" active={view === ViewState.QURAN_INDEX || view === ViewState.QURAN_READ} onClick={() => { setView(ViewState.QURAN_INDEX); setIsMobileMenuOpen(false); }} />
         <SidebarItem icon={MessageCircle} label="Hadith Collection" active={view === ViewState.HADITH} onClick={() => { setView(ViewState.HADITH); if(hadiths.length === 0) loadHadiths(); setIsMobileMenuOpen(false); }} />
-        <SidebarItem icon={Hand} label="Ask Scholar AI" active={view === ViewState.SCHOLAR} onClick={() => { setView(ViewState.SCHOLAR); setIsMobileMenuOpen(false); }} />
+        <SidebarItem icon={Hand} label="AI Scholar" active={view === ViewState.SCHOLAR} onClick={() => { setView(ViewState.SCHOLAR); setIsMobileMenuOpen(false); }} />
       </div>
 
-      <div className="absolute bottom-0 w-full p-6 border-t border-slate-100 bg-slate-50/50">
+      <div className="absolute bottom-0 w-full p-6 bg-slate-50/80 backdrop-blur-md border-t border-slate-100">
         <div className="flex items-center gap-3 mb-4">
-          <div className="w-10 h-10 rounded-full bg-emerald-600 flex items-center justify-center text-white font-bold shadow-md border-2 border-white">
+          <div className="w-10 h-10 rounded-xl bg-emerald-600 flex items-center justify-center text-white font-bold shadow-md shadow-emerald-200">
             {user?.username[0].toUpperCase()}
           </div>
           <div className="flex-1 min-w-0">
             <p className="text-sm font-bold text-slate-800 truncate">{user?.username}</p>
-            <p className="text-[11px] text-slate-500">Standard Account</p>
+            <div className="flex items-center gap-1">
+               <div className="w-2 h-2 rounded-full bg-emerald-500"></div>
+               <p className="text-[10px] text-slate-500 font-medium uppercase">Online</p>
+            </div>
           </div>
         </div>
-        <button onClick={handleLogout} className="flex items-center justify-center gap-2 text-slate-500 hover:bg-red-50 hover:text-red-600 py-2.5 w-full rounded-xl text-sm font-medium transition duration-200">
-          <LogOut size={16} /> Sign Out
+        <button onClick={handleLogout} className="flex items-center justify-center gap-2 text-slate-500 hover:bg-white hover:text-red-600 hover:shadow-sm py-2.5 w-full rounded-xl text-xs font-bold uppercase tracking-wider transition duration-200 border border-transparent hover:border-slate-100">
+          <LogOut size={14} /> Sign Out
         </button>
       </div>
     </div>
   );
 
   const AppGridItem = ({ icon: Icon, label, color, onClick, description }: any) => (
-    <button onClick={onClick} className="flex flex-col items-start p-5 bg-white rounded-2xl shadow-sm border border-slate-100 hover:shadow-md hover:border-emerald-100 transition-all hover:-translate-y-1 group h-full text-left">
-      <div className={`w-12 h-12 rounded-xl flex items-center justify-center ${color} text-white shadow-sm mb-4 group-hover:scale-110 transition duration-300`}>
-        <Icon size={24} />
+    <button onClick={onClick} className="flex flex-col items-start p-5 bg-white rounded-2xl shadow-sm border border-slate-100 hover:shadow-lg hover:shadow-slate-100/50 hover:border-emerald-100 transition-all hover:-translate-y-1 group h-full text-left w-full">
+      <div className={`w-12 h-12 rounded-2xl flex items-center justify-center ${color} text-white shadow-md mb-4 group-hover:scale-110 transition duration-300`}>
+        <Icon size={22} strokeWidth={2.5} />
       </div>
       <span className="text-sm font-bold text-slate-700 mb-1">{label}</span>
-      {description && <span className="text-xs text-slate-400 leading-tight">{description}</span>}
+      {description && <span className="text-xs text-slate-400 leading-tight font-medium">{description}</span>}
     </button>
   );
 
@@ -385,13 +447,11 @@ const App = () => {
 
   if (view === ViewState.AUTH) {
     return (
-      <div className="min-h-screen flex items-center justify-center p-6 relative overflow-hidden">
-        {/* Simple geometric pattern background */}
-        <div className="absolute inset-0 bg-slate-50 z-0">
-            <div className="absolute top-0 left-0 w-full h-full opacity-5" style={{backgroundImage: 'radial-gradient(#10b981 1px, transparent 1px)', backgroundSize: '20px 20px'}}></div>
-        </div>
+      <div className="min-h-screen flex items-center justify-center p-6 relative overflow-hidden bg-slate-50">
+        {/* Decorative background */}
+        <div className="absolute top-0 left-0 w-full h-full opacity-[0.03]" style={{backgroundImage: 'radial-gradient(#10b981 1px, transparent 1px)', backgroundSize: '30px 30px'}}></div>
 
-        <div className="relative bg-white w-full max-w-md p-10 rounded-3xl shadow-xl border border-slate-100 z-10">
+        <div className="relative bg-white/80 backdrop-blur-xl w-full max-w-md p-10 rounded-[2.5rem] shadow-2xl shadow-slate-200/50 border border-white z-10">
           <div className="text-center mb-10">
             <h1 className="text-6xl font-bold text-emerald-700 mb-3 font-arabic drop-shadow-sm">الحكمة</h1>
             <p className="text-slate-400 text-xs font-bold uppercase tracking-[0.3em]">Al-Hikmah Companion</p>
@@ -399,35 +459,35 @@ const App = () => {
           
           <div className="space-y-5">
             {authError && (
-              <div className="bg-red-50 border border-red-100 text-red-600 p-4 rounded-xl text-sm text-center font-medium animate-pulse flex items-center justify-center gap-2">
+              <div className="bg-red-50 border border-red-100 text-red-600 p-4 rounded-2xl text-sm text-center font-medium animate-in fade-in slide-in-from-top-2 flex items-center justify-center gap-2">
                  <Info size={16} /> {authError}
               </div>
             )}
             
             <div className="space-y-4">
               <div>
-                <label className="block text-xs font-bold text-slate-500 uppercase mb-2 ml-1">Username</label>
-                <div className="relative">
-                  <CheckCircle className="absolute left-4 top-1/2 -translate-y-1/2 text-slate-300" size={18}/>
+                <label className="block text-xs font-bold text-slate-400 uppercase mb-2 ml-1 tracking-wider">Username</label>
+                <div className="relative group">
+                  <CheckCircle className="absolute left-4 top-1/2 -translate-y-1/2 text-slate-300 group-focus-within:text-emerald-500 transition" size={18}/>
                   <input
                     type="text"
                     value={usernameInput}
                     onChange={(e) => setUsernameInput(e.target.value)}
-                    className="w-full pl-11 pr-4 py-3.5 bg-slate-50 border border-slate-200 rounded-xl focus:ring-2 focus:ring-emerald-500/20 focus:border-emerald-500 outline-none transition"
+                    className="w-full pl-11 pr-4 py-4 bg-slate-50 border border-slate-200 rounded-2xl focus:ring-2 focus:ring-emerald-500/20 focus:border-emerald-500 outline-none transition text-slate-700 font-medium"
                     placeholder="Choose a username"
                   />
                 </div>
               </div>
 
               <div>
-                <label className="block text-xs font-bold text-slate-500 uppercase mb-2 ml-1">Password</label>
-                <div className="relative">
-                  <Lock className="absolute left-4 top-1/2 -translate-y-1/2 text-slate-300" size={18}/>
+                <label className="block text-xs font-bold text-slate-400 uppercase mb-2 ml-1 tracking-wider">Password</label>
+                <div className="relative group">
+                  <Lock className="absolute left-4 top-1/2 -translate-y-1/2 text-slate-300 group-focus-within:text-emerald-500 transition" size={18}/>
                   <input
                     type="password"
                     value={passwordInput}
                     onChange={(e) => setPasswordInput(e.target.value)}
-                    className="w-full pl-11 pr-4 py-3.5 bg-slate-50 border border-slate-200 rounded-xl focus:ring-2 focus:ring-emerald-500/20 focus:border-emerald-500 outline-none transition"
+                    className="w-full pl-11 pr-4 py-4 bg-slate-50 border border-slate-200 rounded-2xl focus:ring-2 focus:ring-emerald-500/20 focus:border-emerald-500 outline-none transition text-slate-700 font-medium"
                     placeholder="Enter your password"
                   />
                 </div>
@@ -437,12 +497,12 @@ const App = () => {
             <button
               onClick={handleAuth}
               disabled={authLoading}
-              className="w-full bg-emerald-600 hover:bg-emerald-700 text-white font-bold py-4 rounded-xl transition shadow-lg shadow-emerald-200/50 disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center mt-2"
+              className="w-full bg-emerald-600 hover:bg-emerald-700 text-white font-bold py-4 rounded-2xl transition shadow-lg shadow-emerald-200/50 disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center mt-4"
             >
               {authLoading ? <Loader2 className="animate-spin" /> : (isRegistering ? 'Create Account' : 'Sign In')}
             </button>
             
-            <div className="text-center mt-4">
+            <div className="text-center mt-6">
               <button 
                 onClick={() => { setIsRegistering(!isRegistering); setAuthError(''); }}
                 className="text-slate-500 text-sm hover:text-emerald-600 transition font-medium"
@@ -459,14 +519,15 @@ const App = () => {
   // --- Main View ---
 
   return (
-    <div className="flex min-h-screen font-sans text-slate-800">
-      <Sidebar />
+    <div className="flex min-h-screen font-sans text-slate-800 bg-[#f8fafc]">
       
-      <main className="flex-1 lg:ml-72 p-4 sm:p-6 lg:p-10 transition-all duration-300">
+      {/* Content Area - Pushed to LEFT because Sidebar is on RIGHT */}
+      <main className="flex-1 lg:mr-72 p-4 sm:p-6 lg:p-10 transition-all duration-300 animate-in fade-in">
+        
         {/* Mobile Header */}
         <div className="lg:hidden flex justify-between items-center mb-6 bg-white/80 backdrop-blur-md p-4 rounded-2xl shadow-sm border border-slate-100 sticky top-4 z-40">
           <span className="font-bold text-emerald-800 font-arabic text-xl">الحكمة</span>
-          <button onClick={() => setIsMobileMenuOpen(true)} className="text-slate-600">
+          <button onClick={() => setIsMobileMenuOpen(true)} className="text-slate-600 bg-slate-50 p-2 rounded-lg">
             <Menu size={24} />
           </button>
         </div>
@@ -475,90 +536,164 @@ const App = () => {
 
         {view === ViewState.DASHBOARD && (
           <div className="max-w-6xl mx-auto space-y-8">
-            <header className="flex justify-between items-end pb-2 border-b border-slate-100">
+            <header className="flex justify-between items-end pb-4 border-b border-slate-200/50">
               <div>
-                <h1 className="text-2xl font-bold text-slate-800 mb-1">Salam, {user?.username}</h1>
-                <p className="text-slate-400 text-sm">Here is your daily Islamic summary.</p>
+                <h1 className="text-3xl font-bold text-slate-800 mb-1 tracking-tight">Salam, {user?.username}</h1>
+                <p className="text-slate-400 text-sm font-medium">Welcome back to your spiritual space.</p>
               </div>
               <div className="hidden sm:block text-right">
-                <p className="font-arabic text-xl text-emerald-600">بسم الله الرحمن الرحيم</p>
+                <p className="font-arabic text-xl text-emerald-600 drop-shadow-sm">بسم الله الرحمن الرحيم</p>
               </div>
             </header>
 
             <div className="grid lg:grid-cols-3 gap-6">
               {/* Hero Card */}
-              <div className="lg:col-span-2 bg-gradient-to-br from-emerald-600 to-teal-700 rounded-3xl p-8 text-white shadow-xl shadow-emerald-100 relative overflow-hidden group">
-                <div className="absolute top-0 right-0 p-12 opacity-10 transform group-hover:scale-110 transition duration-700">
-                   <BookOpen size={140} />
+              <div className="lg:col-span-2 bg-gradient-to-br from-emerald-600 to-emerald-800 rounded-[2rem] p-8 text-white shadow-xl shadow-emerald-200/50 relative overflow-hidden group flex flex-col justify-between min-h-[280px]">
+                 {/* Background Pattern */}
+                 <div className="absolute inset-0 opacity-10" style={{backgroundImage: 'radial-gradient(#fff 1px, transparent 1px)', backgroundSize: '20px 20px'}}></div>
+                <div className="absolute top-0 right-0 p-12 opacity-10 transform group-hover:scale-110 transition duration-1000 rotate-12">
+                   <BookOpen size={180} />
                 </div>
+                
                 <div className="relative z-10">
-                    <span className="inline-block px-3 py-1 rounded-full bg-white/20 backdrop-blur-sm text-xs font-bold uppercase tracking-wider mb-4 border border-white/10">
-                        Continue Reading
+                    <span className="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-white/10 backdrop-blur-md text-xs font-bold uppercase tracking-wider mb-6 border border-white/20">
+                        <div className="w-2 h-2 rounded-full bg-emerald-300 animate-pulse"></div>
+                        Resume Reading
                     </span>
-                    <h3 className="text-4xl font-bold font-arabic mb-2">{SURAHS[(user?.lastReadSurah || 1) - 1].name}</h3>
-                    <p className="text-emerald-100 text-lg mb-8 font-medium">{SURAHS[(user?.lastReadSurah || 1) - 1].englishName} <span className="opacity-50">•</span> Ayah {user?.lastReadAyah || 1}</p>
-                    
-                    <div className="flex gap-3">
-                        <button 
-                        onClick={() => loadSurah(user?.lastReadSurah || 1)}
-                        className="bg-white text-emerald-700 px-6 py-3 rounded-xl font-bold hover:bg-emerald-50 transition shadow-lg flex items-center gap-2"
-                        >
-                        <PlayCircle size={20} /> Resume
-                        </button>
-                        <button onClick={() => setView(ViewState.QURAN_INDEX)} className="bg-emerald-800/50 text-white px-6 py-3 rounded-xl font-bold hover:bg-emerald-800/70 transition backdrop-blur-sm">
-                            Full Index
-                        </button>
-                    </div>
+                    <h3 className="text-5xl font-bold font-arabic mb-2 leading-tight">{SURAHS[(user?.lastReadSurah || 1) - 1].name}</h3>
+                    <p className="text-emerald-100 text-lg font-medium">{SURAHS[(user?.lastReadSurah || 1) - 1].englishName}</p>
+                </div>
+
+                <div className="relative z-10 mt-8 flex gap-3">
+                    <button 
+                    onClick={() => loadSurah(user?.lastReadSurah || 1)}
+                    className="bg-white text-emerald-800 px-8 py-3.5 rounded-xl font-bold hover:bg-emerald-50 transition shadow-lg flex items-center gap-2"
+                    >
+                    <PlayCircle size={20} /> Continue Ayah {user?.lastReadAyah || 1}
+                    </button>
                 </div>
               </div>
 
               {/* Stats Column */}
               <div className="space-y-4 flex flex-col">
-                <div className="flex-1 bg-white p-6 rounded-3xl border border-slate-100 shadow-sm flex flex-col justify-center relative overflow-hidden">
+                <div className="flex-1 bg-white p-6 rounded-[2rem] border border-slate-100 shadow-sm flex flex-col justify-between relative overflow-hidden group hover:shadow-md transition">
                     <div className="relative z-10">
                         <div className="flex items-center justify-between mb-4">
-                            <h3 className="font-bold text-slate-700">Knowledge Score</h3>
-                            <Brain className="text-purple-500" size={24} />
+                            <h3 className="font-bold text-slate-700 text-sm uppercase tracking-wider">Knowledge</h3>
+                            <div className="p-2 bg-purple-50 text-purple-500 rounded-lg"><Brain size={20} /></div>
                         </div>
-                        <div className="text-4xl font-bold text-slate-800 mb-2">{user?.quizScore || 0}</div>
-                        <p className="text-xs text-slate-400 mb-4">Points earned from quizzes</p>
-                        <button onClick={startQuiz} className="w-full py-2.5 bg-purple-50 text-purple-600 rounded-xl text-sm font-bold hover:bg-purple-100 transition">
-                            Take a Quiz
-                        </button>
+                        <div className="text-4xl font-bold text-slate-800 mb-1">{user?.quizScore || 0}</div>
+                        <p className="text-xs text-slate-400 font-medium">Quiz Points Earned</p>
                     </div>
+                    <button onClick={startQuiz} className="mt-4 w-full py-3 bg-slate-50 text-slate-600 rounded-xl text-sm font-bold hover:bg-purple-50 hover:text-purple-600 transition">
+                        Take Quiz
+                    </button>
                 </div>
                 
-                 <div className="bg-white p-6 rounded-3xl border border-slate-100 shadow-sm flex items-center justify-between">
+                 <div className="bg-white p-6 rounded-[2rem] border border-slate-100 shadow-sm flex items-center justify-between group hover:shadow-md transition">
                     <div>
-                        <p className="text-slate-400 text-xs font-bold uppercase">Tasbih Count</p>
+                        <p className="text-slate-400 text-xs font-bold uppercase tracking-wider">Tasbih</p>
                         <p className="text-3xl font-bold text-teal-600 mt-1">{tasbihCount}</p>
                     </div>
-                    <button onClick={() => setView(ViewState.TASBIH)} className="w-12 h-12 rounded-full bg-teal-50 flex items-center justify-center text-teal-600 hover:bg-teal-100 transition">
+                    <button onClick={() => setView(ViewState.TASBIH)} className="w-12 h-12 rounded-full bg-teal-50 flex items-center justify-center text-teal-600 group-hover:bg-teal-500 group-hover:text-white transition">
                         <ChevronRight size={20} />
                     </button>
                  </div>
               </div>
             </div>
+
+            {/* --- NEW CREATIVE SECTION: Spiritual Mood --- */}
+            <div className="bg-gradient-to-r from-indigo-50 to-blue-50 p-8 rounded-[2rem] border border-indigo-100">
+               <h3 className="text-lg font-bold text-indigo-900 mb-4 flex items-center gap-2">
+                  <Sparkles size={18} className="text-indigo-500"/> How is your heart feeling today?
+               </h3>
+               <div className="flex flex-wrap gap-3 mb-6">
+                  {['Anxious', 'Grateful', 'Lost', 'Sad', 'Hopeful', 'Angry'].map(mood => (
+                    <button key={mood} onClick={() => handleMoodCheck(mood)} className="bg-white px-5 py-2.5 rounded-full text-sm font-bold text-slate-600 hover:bg-indigo-500 hover:text-white hover:shadow-lg hover:shadow-indigo-200 transition border border-indigo-100">
+                       {mood}
+                    </button>
+                  ))}
+               </div>
+               {moodLoading && <div className="flex items-center gap-2 text-indigo-600 text-sm font-bold"><Loader2 className="animate-spin" size={16}/> Finding comfort in the Quran...</div>}
+               {moodResult && (
+                 <div className="bg-white p-6 rounded-2xl shadow-sm border border-indigo-50 animate-in slide-in-from-bottom-2">
+                    <p className="text-right font-arabic text-2xl text-slate-700 mb-4 leading-loose" dir="rtl">{moodResult.arabic}</p>
+                    <p className="text-slate-600 italic mb-3">"{moodResult.translation}"</p>
+                    <p className="text-xs font-bold text-indigo-500 uppercase tracking-wider">{moodResult.ref}</p>
+                 </div>
+               )}
+            </div>
             
+            {/* --- NEW SECTION: Pinned Favorites --- */}
+            {user?.favorites && user.favorites.length > 0 && (
+                <div>
+                    <h3 className="text-lg font-bold text-slate-800 mb-5 flex items-center gap-2"><Heart size={18} className="text-rose-500 fill-current"/> Pinned Favorites</h3>
+                    <div className="flex gap-4 overflow-x-auto pb-4">
+                        {user.favorites.map((item) => {
+                            if (item.type === 'surah') {
+                                const s = SURAHS[(item.ref as number) - 1];
+                                return (
+                                    <button key={item.id} onClick={() => loadSurah(item.ref as number)} className="min-w-[200px] bg-white p-5 rounded-2xl border border-slate-100 shadow-sm hover:border-rose-200 hover:shadow-md transition text-left group relative">
+                                        <div className="flex justify-between items-start mb-3">
+                                            <div className="w-8 h-8 rounded-full bg-slate-50 flex items-center justify-center text-xs font-bold">{s.number}</div>
+                                            <Heart size={16} className="text-rose-500 fill-current" />
+                                        </div>
+                                        <p className="font-bold text-slate-800">{s.englishName}</p>
+                                        <p className="text-xs text-slate-400">{s.englishNameTranslation}</p>
+                                    </button>
+                                )
+                            } else {
+                                // Ayah pin
+                                const ref = item.ref as {surah: number, ayah: number, text?: string};
+                                const s = SURAHS[ref.surah - 1];
+                                return (
+                                    <button key={item.id} onClick={() => loadSurah(ref.surah)} className="min-w-[240px] bg-white p-5 rounded-2xl border border-slate-100 shadow-sm hover:border-rose-200 hover:shadow-md transition text-left">
+                                         <div className="flex justify-between items-start mb-3">
+                                            <span className="text-[10px] font-bold bg-emerald-50 text-emerald-700 px-2 py-1 rounded uppercase">{s.englishName} {ref.surah}:{ref.ayah}</span>
+                                            <Heart size={16} className="text-rose-500 fill-current" />
+                                        </div>
+                                        <p className="text-sm text-slate-600 line-clamp-2 font-serif">"{ref.text || 'Ayah...'}"</p>
+                                    </button>
+                                )
+                            }
+                        })}
+                    </div>
+                </div>
+            )}
+
             {/* Quick Access Grid */}
             <div>
-                <h3 className="text-lg font-bold text-slate-800 mb-4">Quick Tools</h3>
+                <div className="flex items-center justify-between mb-5">
+                    <h3 className="text-lg font-bold text-slate-800">Quick Apps</h3>
+                    <button onClick={() => setView(ViewState.HUB)} className="text-xs font-bold text-emerald-600 hover:text-emerald-700">View All</button>
+                </div>
                 <div className="grid grid-cols-2 sm:grid-cols-4 gap-4">
-                    <button onClick={() => setView(ViewState.SALAH)} className="bg-white p-4 rounded-2xl border border-slate-100 shadow-sm hover:border-emerald-200 hover:shadow-md transition text-left">
-                        <AlignLeft className="text-green-500 mb-3" size={24} />
-                        <p className="font-bold text-slate-700 text-sm">Salah Guide</p>
+                    <button onClick={() => setView(ViewState.SALAH)} className="flex flex-col items-center justify-center p-6 bg-white rounded-3xl border border-slate-100 shadow-sm hover:border-green-200 hover:shadow-lg hover:shadow-green-100/50 transition-all hover:-translate-y-1 group">
+                        <div className="w-14 h-14 rounded-2xl bg-green-500 text-white flex items-center justify-center mb-3 shadow-lg shadow-green-200 group-hover:scale-110 transition">
+                            <AlignLeft size={24} strokeWidth={2.5}/>
+                        </div>
+                        <p className="font-bold text-slate-700 text-sm">Salah</p>
                     </button>
-                    <button onClick={() => setView(ViewState.DUA)} className="bg-white p-4 rounded-2xl border border-slate-100 shadow-sm hover:border-blue-200 hover:shadow-md transition text-left">
-                        <Coffee className="text-blue-500 mb-3" size={24} />
+
+                    <button onClick={() => setView(ViewState.DUA)} className="flex flex-col items-center justify-center p-6 bg-white rounded-3xl border border-slate-100 shadow-sm hover:border-blue-200 hover:shadow-lg hover:shadow-blue-100/50 transition-all hover:-translate-y-1 group">
+                        <div className="w-14 h-14 rounded-2xl bg-blue-500 text-white flex items-center justify-center mb-3 shadow-lg shadow-blue-200 group-hover:scale-110 transition">
+                            <Coffee size={24} strokeWidth={2.5}/>
+                        </div>
                         <p className="font-bold text-slate-700 text-sm">Daily Dua</p>
                     </button>
-                    <button onClick={() => setView(ViewState.SCHOLAR)} className="bg-white p-4 rounded-2xl border border-slate-100 shadow-sm hover:border-emerald-200 hover:shadow-md transition text-left">
-                        <Hand className="text-emerald-500 mb-3" size={24} />
-                        <p className="font-bold text-slate-700 text-sm">Ask Scholar</p>
+
+                    <button onClick={() => setView(ViewState.SCHOLAR)} className="flex flex-col items-center justify-center p-6 bg-white rounded-3xl border border-slate-100 shadow-sm hover:border-emerald-200 hover:shadow-lg hover:shadow-emerald-100/50 transition-all hover:-translate-y-1 group">
+                        <div className="w-14 h-14 rounded-2xl bg-emerald-500 text-white flex items-center justify-center mb-3 shadow-lg shadow-emerald-200 group-hover:scale-110 transition">
+                            <Hand size={24} strokeWidth={2.5}/>
+                        </div>
+                        <p className="font-bold text-slate-700 text-sm">Ask AI</p>
                     </button>
-                    <button onClick={() => setView(ViewState.FOODS)} className="bg-white p-4 rounded-2xl border border-slate-100 shadow-sm hover:border-orange-200 hover:shadow-md transition text-left">
-                        <Utensils className="text-orange-500 mb-3" size={24} />
-                        <p className="font-bold text-slate-700 text-sm">Sunnah Foods</p>
+
+                    <button onClick={() => setView(ViewState.FOODS)} className="flex flex-col items-center justify-center p-6 bg-white rounded-3xl border border-slate-100 shadow-sm hover:border-orange-200 hover:shadow-lg hover:shadow-orange-100/50 transition-all hover:-translate-y-1 group">
+                        <div className="w-14 h-14 rounded-2xl bg-orange-500 text-white flex items-center justify-center mb-3 shadow-lg shadow-orange-200 group-hover:scale-110 transition">
+                            <Utensils size={24} strokeWidth={2.5}/>
+                        </div>
+                        <p className="font-bold text-slate-700 text-sm">Foods</p>
                     </button>
                 </div>
             </div>
@@ -570,14 +705,14 @@ const App = () => {
             <div className="flex flex-col md:flex-row md:items-center gap-6 mb-10">
               <div>
                  <h2 className="text-3xl font-bold text-slate-800 mb-1">Noble Quran</h2>
-                 <p className="text-slate-400">Index of all 114 Surahs</p>
+                 <p className="text-slate-400 font-medium">Index of all 114 Surahs</p>
               </div>
               <div className="relative flex-1 max-w-md md:ml-auto">
                 <Search className="absolute left-4 top-1/2 -translate-y-1/2 text-slate-400" size={20} />
                 <input 
                   type="text" 
                   placeholder="Search by name or number..." 
-                  className="w-full pl-11 pr-4 py-3 rounded-xl bg-white border border-slate-200 focus:ring-2 focus:ring-emerald-500/20 focus:border-emerald-500 outline-none shadow-sm transition"
+                  className="w-full pl-11 pr-4 py-3.5 rounded-2xl bg-white border border-slate-200 focus:ring-2 focus:ring-emerald-500/20 focus:border-emerald-500 outline-none shadow-sm transition"
                   value={searchTerm}
                   onChange={(e) => setSearchTerm(e.target.value)}
                 />
@@ -589,28 +724,36 @@ const App = () => {
                 s.englishName.toLowerCase().includes(searchTerm.toLowerCase()) || 
                 s.number.toString().includes(searchTerm) ||
                 s.name.includes(searchTerm)
-              ).map((surah) => (
-                <button
-                  key={surah.number}
-                  onClick={() => loadSurah(surah.number)}
-                  className="bg-white p-5 rounded-2xl shadow-sm border border-slate-100 hover:shadow-md hover:border-emerald-100 hover:-translate-y-0.5 transition-all text-left flex items-center justify-between group relative overflow-hidden"
-                >
-                  <div className="absolute top-0 right-0 w-16 h-16 bg-emerald-50 rounded-bl-full -mr-8 -mt-8 transition-all group-hover:bg-emerald-100"></div>
-                  
-                  <div className="flex items-center gap-4 z-10">
-                    <div className="w-10 h-10 rounded-xl bg-slate-50 text-slate-400 flex items-center justify-center font-bold text-sm group-hover:bg-emerald-600 group-hover:text-white transition duration-300 border border-slate-100">
-                      {surah.number}
+              ).map((surah) => {
+                const isPinned = isFavorite('surah', surah.number);
+                return (
+                  <button
+                    key={surah.number}
+                    onClick={() => loadSurah(surah.number)}
+                    className="bg-white p-5 rounded-2xl shadow-sm border border-slate-100 hover:shadow-md hover:border-emerald-100 hover:-translate-y-0.5 transition-all text-left flex items-center justify-between group relative overflow-hidden"
+                  >
+                    <div className="absolute top-0 right-0 w-20 h-20 bg-emerald-50/50 rounded-bl-[3rem] -mr-6 -mt-6 transition-all group-hover:bg-emerald-100/80"></div>
+                    
+                    <div className="flex items-center gap-4 z-10">
+                      <div className="w-10 h-10 rounded-xl bg-slate-50 text-slate-400 flex items-center justify-center font-bold text-sm group-hover:bg-emerald-600 group-hover:text-white transition duration-300 border border-slate-100">
+                        {surah.number}
+                      </div>
+                      <div>
+                        <h3 className="font-bold text-slate-800 leading-tight mb-0.5">{surah.englishName}</h3>
+                        <p className="text-[11px] text-slate-400 uppercase tracking-wide font-semibold">{surah.revelationType} • {surah.numberOfAyahs}</p>
+                      </div>
                     </div>
-                    <div>
-                      <h3 className="font-bold text-slate-800 leading-tight mb-0.5">{surah.englishName}</h3>
-                      <p className="text-[11px] text-slate-400 uppercase tracking-wide">{surah.revelationType} • {surah.numberOfAyahs}</p>
+                    <div className="z-10 pl-2 flex flex-col items-end justify-between h-full">
+                      <button 
+                        onClick={(e) => toggleFavoriteSurah(surah.number, e)}
+                        className={`p-2 rounded-full transition ${isPinned ? 'text-rose-500' : 'text-slate-300 hover:text-rose-400'}`}
+                      >
+                        <Heart size={18} fill={isPinned ? "currentColor" : "none"} />
+                      </button>
                     </div>
-                  </div>
-                  <div className="z-10">
-                    <span className="font-arabic text-xl text-emerald-800/80 group-hover:text-emerald-800 transition">{surah.name}</span>
-                  </div>
-                </button>
-              ))}
+                  </button>
+                );
+              })}
             </div>
           </div>
         )}
@@ -618,9 +761,9 @@ const App = () => {
         {view === ViewState.QURAN_READ && (
           <div className="max-w-4xl mx-auto">
             {/* Sticky Header */}
-             <div className="sticky top-0 z-30 bg-white/90 backdrop-blur-md border-b border-slate-100 mb-8 -mx-4 sm:-mx-6 lg:-mx-10 px-4 sm:px-6 lg:px-10 py-4 flex items-center justify-between shadow-sm">
-                <button onClick={() => setView(ViewState.QURAN_INDEX)} className="p-2 -ml-2 rounded-full hover:bg-slate-100 text-slate-500 transition">
-                  <ArrowLeft size={22} />
+             <div className="sticky top-0 z-30 bg-[#f8fafc]/90 backdrop-blur-md border-b border-slate-200/50 mb-8 -mx-4 sm:-mx-6 lg:-mx-10 px-4 sm:px-6 lg:px-10 py-4 flex items-center justify-between">
+                <button onClick={() => setView(ViewState.QURAN_INDEX)} className="p-2 -ml-2 rounded-full bg-white hover:bg-slate-100 text-slate-500 transition shadow-sm border border-slate-100">
+                  <ArrowLeft size={20} />
                 </button>
                 <div className="text-center">
                   <h2 className="font-bold text-slate-800">{SURAHS[currentSurah - 1].englishName}</h2>
@@ -629,24 +772,29 @@ const App = () => {
                 <div className="w-10"></div> {/* Spacer for centering */}
              </div>
 
-            <div className="bg-white rounded-3xl shadow-sm border border-slate-100 min-h-[80vh] p-8 sm:p-12 relative">
+            <div className="bg-white rounded-[2.5rem] shadow-sm border border-slate-100 min-h-[80vh] p-8 sm:p-12 relative">
               
               {/* Bismillah (except Surah 9) */}
               {currentSurah !== 9 && (
                  <div className="text-center mb-16 mt-4">
-                    <p className="font-arabic text-4xl sm:text-5xl text-slate-800 leading-relaxed">{BISMILLAH}</p>
+                    <p className="font-arabic text-4xl sm:text-5xl text-slate-800 leading-relaxed opacity-80">{BISMILLAH}</p>
                  </div>
               )}
 
               {loadingAyahs ? <Loading /> : (
                 <div className="space-y-2">
-                  {ayahs.map((ayah, idx) => (
+                  {ayahs.map((ayah, idx) => {
+                    const isPinned = isFavorite('ayah', ayah.numberInSurah);
+                    return (
                     <React.Fragment key={ayah.numberInSurah}>
                         <div className="group relative py-6 transition-colors hover:bg-slate-50/50 rounded-3xl px-4 -mx-4">
                             {/* Actions Toolbar */}
                             <div className="absolute top-6 left-4 opacity-0 group-hover:opacity-100 transition-opacity flex gap-2">
                                 <button onClick={() => handleViewTafsir(ayah.numberInSurah)} className={`p-2 rounded-full transition shadow-sm border ${selectedAyahForTafsir === ayah.numberInSurah ? 'bg-amber-100 text-amber-700 border-amber-200' : 'bg-white text-slate-400 border-slate-200 hover:text-emerald-600'}`} title="Tafsir">
                                     <BookOpen size={16} />
+                                </button>
+                                <button onClick={() => toggleFavoriteAyah(ayah.numberInSurah, ayah.translation)} className={`p-2 rounded-full transition shadow-sm border ${isPinned ? 'bg-rose-50 text-rose-500 border-rose-200' : 'bg-white text-slate-400 border-slate-200 hover:text-rose-500'}`} title="Pin Ayah">
+                                    <Heart size={16} fill={isPinned ? "currentColor" : "none"} />
                                 </button>
                                 <span className="w-8 h-8 rounded-full bg-emerald-50 text-emerald-700 border border-emerald-100 flex items-center justify-center text-xs font-bold">
                                     {ayah.numberInSurah}
@@ -655,7 +803,7 @@ const App = () => {
 
                             {/* Content */}
                             <div className="space-y-8 pl-0 sm:pl-12">
-                                <p className="text-right font-arabic text-4xl sm:text-5xl leading-[2.2] text-slate-800" dir="rtl">
+                                <p className="text-right font-arabic text-4xl sm:text-5xl leading-[2.3] text-slate-800" dir="rtl">
                                     {ayah.text}
                                 </p>
                                 <div className="space-y-2">
@@ -681,7 +829,7 @@ const App = () => {
                            <div className="ornament-divider"><span className="text-emerald-200 text-xl">۞</span></div>
                         )}
                     </React.Fragment>
-                  ))}
+                  )})}
                 </div>
               )}
             </div>
@@ -689,32 +837,32 @@ const App = () => {
         )}
 
         {view === ViewState.SCHOLAR && (
-           <div className="max-w-4xl mx-auto flex flex-col h-[calc(100vh-6rem)] bg-white rounded-3xl shadow-lg shadow-slate-200/50 border border-slate-100 overflow-hidden">
+           <div className="max-w-4xl mx-auto flex flex-col h-[calc(100vh-6rem)] bg-white rounded-[2.5rem] shadow-lg shadow-slate-200/50 border border-slate-100 overflow-hidden">
              {/* Header */}
-             <div className="p-6 border-b border-slate-100 bg-emerald-50/30 flex justify-between items-center">
+             <div className="p-6 border-b border-slate-100 bg-slate-50/50 flex justify-between items-center">
                <div className="flex items-center gap-4">
-                 <div className="w-12 h-12 rounded-full bg-gradient-to-br from-emerald-500 to-teal-600 flex items-center justify-center text-white shadow-md">
+                 <div className="w-12 h-12 rounded-2xl bg-gradient-to-br from-emerald-500 to-teal-600 flex items-center justify-center text-white shadow-md">
                    <Hand size={24} />
                  </div>
                  <div>
                    <h2 className="font-bold text-slate-800 text-lg">AI Scholar (Hanafi)</h2>
-                   <p className="text-xs text-emerald-600 font-medium uppercase tracking-wide">Online & Ready</p>
+                   <p className="text-xs text-emerald-600 font-bold uppercase tracking-wide">Online & Ready</p>
                  </div>
                </div>
              </div>
 
              {/* Chat Area */}
-             <div className="flex-1 overflow-y-auto p-6 space-y-8 bg-slate-50/30">
+             <div className="flex-1 overflow-y-auto p-6 space-y-8">
                {chatHistory.length === 0 && (
                  <div className="text-center text-slate-400 mt-20 max-w-sm mx-auto">
-                   <div className="w-20 h-20 bg-slate-100 rounded-full flex items-center justify-center mx-auto mb-6">
-                      <Sparkles size={32} className="text-slate-300" />
+                   <div className="w-20 h-20 bg-emerald-50 rounded-full flex items-center justify-center mx-auto mb-6">
+                      <Sparkles size={32} className="text-emerald-300" />
                    </div>
                    <h3 className="text-slate-700 font-bold mb-2">How can I help you?</h3>
                    <p className="text-sm mb-8">Ask about Fiqh, History, or get advice based on the Quran and Sunnah.</p>
                    <div className="grid grid-cols-1 gap-3">
-                      <button onClick={() => setChatInput("Is seafood halal?")} className="text-xs bg-white border border-slate-200 p-3 rounded-xl hover:border-emerald-400 transition">"Is seafood halal in Hanafi school?"</button>
-                      <button onClick={() => setChatInput("Explain the conditions of Wudu")} className="text-xs bg-white border border-slate-200 p-3 rounded-xl hover:border-emerald-400 transition">"Explain the conditions of Wudu"</button>
+                      <button onClick={() => setChatInput("Is seafood halal?")} className="text-xs font-medium bg-white border border-slate-200 p-4 rounded-xl hover:border-emerald-400 hover:text-emerald-600 transition text-left">"Is seafood halal in Hanafi school?"</button>
+                      <button onClick={() => setChatInput("Explain the conditions of Wudu")} className="text-xs font-medium bg-white border border-slate-200 p-4 rounded-xl hover:border-emerald-400 hover:text-emerald-600 transition text-left">"Explain the conditions of Wudu"</button>
                    </div>
                  </div>
                )}
@@ -729,13 +877,13 @@ const App = () => {
                    <div className={`max-w-[80%] p-5 rounded-2xl shadow-sm ${
                      msg.role === 'user' 
                        ? 'bg-emerald-600 text-white rounded-tr-none' 
-                       : 'bg-white text-slate-700 border border-slate-100 rounded-tl-none'
+                       : 'bg-slate-50 text-slate-700 border border-slate-100 rounded-tl-none'
                    }`}>
                      {msg.role === 'model' ? (
                         <div className="prose prose-sm max-w-none prose-emerald">
                             {msg.text.includes('|||') ? (
                                 <>
-                                    <p className="font-bold text-base text-slate-900 mb-4 border-b border-slate-100 pb-3">
+                                    <p className="font-bold text-base text-slate-900 mb-4 border-b border-slate-200/50 pb-3">
                                         {msg.text.split('|||')[0]}
                                     </p>
                                     <p className="text-slate-600 leading-relaxed">
@@ -745,7 +893,7 @@ const App = () => {
                             ) : <p>{msg.text}</p>}
                         </div>
                      ) : (
-                        <p className="leading-relaxed">{msg.text}</p>
+                        <p className="leading-relaxed font-medium">{msg.text}</p>
                      )}
                    </div>
                  </div>
@@ -769,7 +917,7 @@ const App = () => {
                    onChange={(e) => setChatInput(e.target.value)}
                    onKeyDown={(e) => e.key === 'Enter' && handleScholarChat()}
                    placeholder="Type your question..."
-                   className="flex-1 px-5 py-4 rounded-2xl bg-slate-50 border border-slate-200 focus:ring-2 focus:ring-emerald-500/20 focus:border-emerald-500 outline-none transition"
+                   className="flex-1 px-5 py-4 rounded-2xl bg-slate-50 border border-slate-200 focus:ring-2 focus:ring-emerald-500/20 focus:border-emerald-500 outline-none transition font-medium"
                  />
                  <button 
                    onClick={handleScholarChat}
@@ -853,7 +1001,7 @@ const App = () => {
             <div className="space-y-10">
                 {/* Worship Section */}
                 <section>
-                    <h3 className="text-sm font-bold text-slate-400 uppercase tracking-widest mb-6 flex items-center gap-2">
+                    <h3 className="text-xs font-bold text-slate-400 uppercase tracking-widest mb-6 flex items-center gap-2 ml-1">
                         <Layers size={16}/> Worship Tools
                     </h3>
                     <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-4 gap-5">
@@ -866,7 +1014,7 @@ const App = () => {
 
                 {/* Knowledge Section */}
                 <section>
-                    <h3 className="text-sm font-bold text-slate-400 uppercase tracking-widest mb-6 flex items-center gap-2">
+                    <h3 className="text-xs font-bold text-slate-400 uppercase tracking-widest mb-6 flex items-center gap-2 ml-1">
                         <BookOpen size={16}/> Knowledge & Learning
                     </h3>
                     <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-4 gap-5">
@@ -877,7 +1025,7 @@ const App = () => {
 
                 {/* Lifestyle Section */}
                 <section>
-                    <h3 className="text-sm font-bold text-slate-400 uppercase tracking-widest mb-6 flex items-center gap-2">
+                    <h3 className="text-xs font-bold text-slate-400 uppercase tracking-widest mb-6 flex items-center gap-2 ml-1">
                         <Sparkles size={16}/> Lifestyle
                     </h3>
                     <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-4 gap-5">
@@ -892,11 +1040,11 @@ const App = () => {
 
         {view === ViewState.QUIZ && (
           <div className="max-w-2xl mx-auto pt-8">
-            <button onClick={() => setView(ViewState.HUB)} className="mb-6 text-slate-400 hover:text-slate-800 flex items-center gap-2 text-sm font-bold"><ArrowLeft size={16}/> Back to Hub</button>
+            <button onClick={() => setView(ViewState.HUB)} className="mb-6 text-slate-400 hover:text-slate-800 flex items-center gap-2 text-sm font-bold bg-white px-4 py-2 rounded-full shadow-sm"><ArrowLeft size={16}/> Back to Hub</button>
             
             {isChatLoading ? <Loading /> : quizQuestions.length > 0 && (
-              <div className="bg-white rounded-3xl shadow-xl border border-slate-100 overflow-hidden">
-                <div className="bg-purple-600 p-8 text-white text-center relative overflow-hidden">
+              <div className="bg-white rounded-[2.5rem] shadow-xl border border-slate-100 overflow-hidden">
+                <div className="bg-purple-600 p-10 text-white text-center relative overflow-hidden">
                   <div className="absolute inset-0 bg-purple-900/20"></div>  
                   <div className="relative z-10">
                     <div className="flex justify-between items-center mb-6 opacity-90 text-xs font-bold uppercase tracking-wider">
@@ -948,7 +1096,7 @@ const App = () => {
         )}
 
         {view === ViewState.ZAKAT && (
-          <div className="max-w-xl mx-auto bg-white p-8 sm:p-10 rounded-3xl shadow-lg border border-slate-100 mt-10">
+          <div className="max-w-xl mx-auto bg-white p-8 sm:p-10 rounded-[2.5rem] shadow-lg border border-slate-100 mt-10">
              <button onClick={() => setView(ViewState.HUB)} className="mb-8 text-slate-400 hover:text-slate-600 transition"><ArrowLeft /></button>
              
              <div className="text-center mb-10">
@@ -1000,7 +1148,7 @@ const App = () => {
         {view === ViewState.TASBIH && (
           <div className="max-w-md mx-auto text-center pt-12 h-full flex flex-col justify-center">
             <div className="absolute top-8 left-4 sm:left-8">
-                <button onClick={() => setView(ViewState.HUB)} className="text-slate-400 hover:text-slate-600"><ArrowLeft /></button>
+                <button onClick={() => setView(ViewState.HUB)} className="text-slate-400 hover:text-slate-600 bg-white p-2 rounded-full shadow-sm"><ArrowLeft /></button>
             </div>
             
             <h2 className="text-3xl font-bold text-teal-900 mb-10">Digital Tasbih</h2>
@@ -1024,7 +1172,7 @@ const App = () => {
         {view === ViewState.NAMES && (
           <div className="max-w-5xl mx-auto">
             <div className="flex items-center gap-3 mb-8">
-               <button onClick={() => setView(ViewState.HUB)} className="text-slate-400 hover:text-slate-600"><ArrowLeft /></button>
+               <button onClick={() => setView(ViewState.HUB)} className="text-slate-400 hover:text-slate-600 bg-white p-2 rounded-full shadow-sm"><ArrowLeft /></button>
                <h2 className="text-2xl font-bold text-pink-700">99 Names of Allah</h2>
             </div>
             <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 gap-4">
@@ -1043,8 +1191,8 @@ const App = () => {
 
         {view === ViewState.DUA && (
           <div className="max-w-3xl mx-auto">
-            <div className="sticky top-0 bg-slate-50/90 backdrop-blur p-4 -mx-4 mb-6 border-b border-slate-200 z-20 flex items-center gap-3">
-               <button onClick={() => setView(ViewState.HUB)} className="text-slate-400 hover:text-slate-600"><ArrowLeft /></button>
+            <div className="sticky top-0 bg-[#f8fafc]/90 backdrop-blur p-4 -mx-4 mb-6 border-b border-slate-200 z-20 flex items-center gap-3">
+               <button onClick={() => setView(ViewState.HUB)} className="text-slate-400 hover:text-slate-600 bg-white p-2 rounded-full shadow-sm"><ArrowLeft /></button>
                <h2 className="text-2xl font-bold text-blue-800">Fortress of Dua</h2>
             </div>
             <div className="space-y-10">
@@ -1052,22 +1200,22 @@ const App = () => {
                 <div key={i}>
                   <div className="flex items-center gap-4 mb-4">
                     <div className="h-[1px] bg-slate-200 flex-1"></div>
-                    <h3 className="text-sm font-bold text-slate-400 uppercase tracking-widest bg-slate-100 px-3 py-1 rounded-full">{category.category}</h3>
+                    <h3 className="text-xs font-bold text-slate-400 uppercase tracking-widest bg-white border border-slate-100 px-3 py-1 rounded-full shadow-sm">{category.category}</h3>
                     <div className="h-[1px] bg-slate-200 flex-1"></div>
                   </div>
                   <div className="space-y-6">
                     {category.items.map((dua, idx) => (
-                      <div key={idx} className="bg-white p-8 rounded-3xl shadow-sm border border-slate-100 relative overflow-hidden">
+                      <div key={idx} className="bg-white p-8 rounded-[2rem] shadow-sm border border-slate-100 relative overflow-hidden">
                         <div className="absolute top-0 right-0 p-4 opacity-5 text-blue-500">
                             <Coffee size={100} />
                         </div>
                         <p className="font-arabic text-3xl text-right mb-6 text-slate-700 leading-loose relative z-10" dir="rtl">{dua.arabic}</p>
-                        <div className="bg-blue-50/50 p-4 rounded-2xl mb-4 border border-blue-50">
+                        <div className="bg-blue-50/50 p-5 rounded-2xl mb-4 border border-blue-50">
                             <p className="text-slate-800 font-medium leading-relaxed">"{dua.translation}"</p>
                         </div>
                         <p className="text-slate-400 text-sm italic mb-4">{dua.transliteration}</p>
                         <div className="flex justify-end">
-                             <span className="text-[10px] font-bold uppercase bg-slate-100 text-slate-500 px-2 py-1 rounded border border-slate-200">{dua.ref}</span>
+                             <span className="text-[10px] font-bold uppercase bg-slate-50 text-slate-500 px-2 py-1 rounded border border-slate-200">Ref: {dua.ref}</span>
                         </div>
                       </div>
                     ))}
@@ -1081,18 +1229,18 @@ const App = () => {
         {view === ViewState.SALAH && (
           <div className="max-w-4xl mx-auto">
              <div className="flex items-center gap-3 mb-8">
-               <button onClick={() => setView(ViewState.HUB)} className="text-slate-400 hover:text-slate-600"><ArrowLeft /></button>
+               <button onClick={() => setView(ViewState.HUB)} className="text-slate-400 hover:text-slate-600 bg-white p-2 rounded-full shadow-sm"><ArrowLeft /></button>
                <h2 className="text-2xl font-bold text-green-800">Salah Guide (Hanafi)</h2>
             </div>
             <div className="grid md:grid-cols-2 gap-6">
               {SALAH_STEPS.map((step) => (
-                <div key={step.step} className="flex gap-5 bg-white p-6 rounded-2xl shadow-sm border border-slate-100 hover:border-green-300 transition group">
+                <div key={step.step} className="flex gap-5 bg-white p-6 rounded-3xl shadow-sm border border-slate-100 hover:border-green-300 transition group">
                   <div className="w-12 h-12 rounded-2xl bg-green-50 text-green-600 flex items-center justify-center font-bold text-xl flex-shrink-0 group-hover:bg-green-500 group-hover:text-white transition duration-300 shadow-sm">
                     {step.step}
                   </div>
                   <div>
                     <h3 className="font-bold text-slate-800 text-lg mb-2">{step.title}</h3>
-                    <p className="text-slate-600 leading-relaxed text-sm">{step.desc}</p>
+                    <p className="text-slate-600 leading-relaxed text-sm font-medium">{step.desc}</p>
                   </div>
                 </div>
               ))}
@@ -1103,15 +1251,17 @@ const App = () => {
         {view === ViewState.FOODS && (
           <div className="max-w-5xl mx-auto">
             <div className="flex items-center gap-3 mb-8">
-               <button onClick={() => setView(ViewState.HUB)} className="text-slate-400 hover:text-slate-600"><ArrowLeft /></button>
+               <button onClick={() => setView(ViewState.HUB)} className="text-slate-400 hover:text-slate-600 bg-white p-2 rounded-full shadow-sm"><ArrowLeft /></button>
                <h2 className="text-2xl font-bold text-orange-800">Sunnah Foods</h2>
             </div>
             <div className="grid sm:grid-cols-2 lg:grid-cols-3 gap-5">
               {SUNNAH_FOODS_DATA.map((food, i) => (
-                <div key={i} className="bg-white p-6 rounded-2xl shadow-sm border border-slate-100 hover:shadow-lg hover:border-orange-200 transition group h-full flex flex-col">
+                <div key={i} className="bg-white p-6 rounded-3xl shadow-sm border border-slate-100 hover:shadow-lg hover:border-orange-200 transition group h-full flex flex-col">
                   <div className="flex justify-between items-start mb-4">
                      <h3 className="text-xl font-bold text-slate-800">{food.name}</h3>
-                     <Utensils size={18} className="text-orange-300 group-hover:text-orange-500 transition"/>
+                     <div className="p-2 bg-orange-50 rounded-lg text-orange-500 group-hover:bg-orange-500 group-hover:text-white transition">
+                        <Utensils size={18} />
+                     </div>
                   </div>
                   <p className="text-slate-600 text-sm mb-6 flex-1 leading-relaxed">{food.benefit}</p>
                   <div className="pt-4 border-t border-slate-50">
@@ -1124,7 +1274,7 @@ const App = () => {
         )}
 
         {view === ViewState.DREAM && (
-          <div className="max-w-2xl mx-auto bg-white p-10 rounded-3xl shadow-xl border border-slate-100 mt-8">
+          <div className="max-w-2xl mx-auto bg-white p-10 rounded-[2.5rem] shadow-xl border border-slate-100 mt-8">
             <button onClick={() => setView(ViewState.HUB)} className="mb-6 text-slate-400 hover:text-slate-600 transition"><ArrowLeft /></button>
             <div className="text-center mb-8">
                 <div className="w-16 h-16 bg-indigo-50 rounded-full flex items-center justify-center mx-auto mb-4 text-indigo-500">
@@ -1162,8 +1312,8 @@ const App = () => {
         )}
 
         {view === ViewState.HALAL && (
-          <div className="max-w-2xl mx-auto bg-white p-10 rounded-3xl shadow-xl border border-slate-100 mt-8">
-            <button onClick={() => setView(ViewState.HUB)} className="mb-6 text-slate-400 hover:text-slate-600"><ArrowLeft /></button>
+          <div className="max-w-2xl mx-auto bg-white p-10 rounded-[2.5rem] shadow-xl border border-slate-100 mt-8">
+            <button onClick={() => setView(ViewState.HUB)} className="mb-6 text-slate-400 hover:text-slate-600 transition"><ArrowLeft /></button>
             <div className="text-center mb-8">
                 <div className="w-16 h-16 bg-rose-50 rounded-full flex items-center justify-center mx-auto mb-4 text-rose-500">
                     <Search size={32} />
@@ -1205,6 +1355,10 @@ const App = () => {
         )}
 
       </main>
+      
+      {/* Sidebar - Moved to RIGHT */}
+      <Sidebar />
+      
     </div>
   );
 };
