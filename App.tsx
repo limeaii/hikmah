@@ -6,7 +6,8 @@ import {
   Menu, X, ChevronRight, ChevronLeft, PlayCircle,
   Bookmark as BookmarkIcon, Loader2, Grid, Lock, 
   Moon, Sun, CheckCircle, Utensils, Brain, Info, 
-  ArrowLeft, Send, Share2, Coffee, AlignLeft, Book
+  ArrowLeft, Send, Share2, Coffee, AlignLeft, Book,
+  Star, Layers, Sparkles
 } from 'lucide-react';
 import { ViewState, UserProfile, Ayah, Hadith, QuizQuestion, SurahMetadata } from './types';
 import { SURAHS, ALLAH_NAMES, ZAKAT_THRESHOLD_GOLD_GRAMS, DUAS_DATA, SALAH_STEPS, SUNNAH_FOODS_DATA } from './constants';
@@ -15,25 +16,42 @@ import * as GeminiService from './services/gemini';
 // --- Constants & Helpers ---
 
 const DB_KEY = 'noor_users_db_v2';
+const BISMILLAH = "بِسْمِ ٱللَّهِ ٱلرَّحْمَٰنِ ٱلرَّحِيمِ";
 
 const SidebarItem = ({ icon: Icon, label, active, onClick }: any) => (
   <button
     onClick={onClick}
-    className={`w-full flex items-center gap-3 px-4 py-3 rounded-xl transition-all duration-200 ${
+    className={`w-full flex items-center gap-3 px-4 py-3.5 rounded-xl transition-all duration-200 group ${
       active 
-        ? 'bg-emerald-600 text-white shadow-lg shadow-emerald-200' 
-        : 'text-slate-600 hover:bg-emerald-50 hover:text-emerald-700'
+        ? 'bg-emerald-50 text-emerald-700 font-semibold shadow-sm ring-1 ring-emerald-100' 
+        : 'text-slate-500 hover:bg-white hover:text-slate-800 hover:shadow-sm'
     }`}
   >
-    <Icon size={20} />
-    <span className="font-medium">{label}</span>
+    <Icon size={20} className={`transition-colors ${active ? 'text-emerald-600' : 'text-slate-400 group-hover:text-slate-600'}`} />
+    <span className="text-sm">{label}</span>
+    {active && <ChevronRight size={16} className="ml-auto opacity-50" />}
   </button>
 );
 
 const Loading = () => (
-  <div className="flex flex-col justify-center items-center py-16 gap-4">
-    <Loader2 className="animate-spin text-emerald-600" size={40} />
-    <p className="text-slate-400 text-sm animate-pulse">Consulting the knowledge...</p>
+  <div className="flex flex-col justify-center items-center py-20 gap-6">
+    <div className="relative">
+      <div className="absolute inset-0 bg-emerald-100 rounded-full blur-xl opacity-50 animate-pulse"></div>
+      <Loader2 className="animate-spin text-emerald-600 relative z-10" size={48} />
+    </div>
+    <p className="text-slate-400 text-sm font-medium animate-pulse">Consulting the knowledge...</p>
+  </div>
+);
+
+const StatCard = ({ label, value, icon: Icon, colorClass }: any) => (
+  <div className="bg-white p-5 rounded-2xl border border-slate-100 shadow-sm flex items-center gap-4">
+    <div className={`w-12 h-12 rounded-full flex items-center justify-center ${colorClass} bg-opacity-10`}>
+      <Icon className={colorClass.replace('bg-', 'text-')} size={24} />
+    </div>
+    <div>
+      <p className="text-slate-400 text-xs font-bold uppercase tracking-wider">{label}</p>
+      <p className="text-xl font-bold text-slate-800">{value}</p>
+    </div>
   </div>
 );
 
@@ -304,18 +322,19 @@ const App = () => {
   // --- Render Components ---
 
   const Sidebar = () => (
-    <div className={`fixed inset-y-0 left-0 z-50 w-72 bg-white shadow-2xl transform transition-transform duration-300 ease-in-out lg:translate-x-0 ${isMobileMenuOpen ? 'translate-x-0' : '-translate-x-full'}`}>
-      <div className="p-6 flex justify-between items-center bg-gradient-to-r from-emerald-600 to-teal-600 text-white">
+    <div className={`fixed inset-y-0 left-0 z-50 w-72 bg-white/95 backdrop-blur-md border-r border-slate-200 shadow-xl transform transition-transform duration-300 ease-in-out lg:translate-x-0 ${isMobileMenuOpen ? 'translate-x-0' : '-translate-x-full'}`}>
+      <div className="p-8 flex justify-between items-center">
         <div>
-          <h2 className="text-3xl font-bold font-arabic">الحكمة</h2>
-          <p className="text-emerald-100 text-xs uppercase tracking-widest">Al-Hikmah</p>
+          <h2 className="text-3xl font-bold text-emerald-700 font-arabic leading-none mb-1">الحكمة</h2>
+          <p className="text-slate-400 text-[10px] font-bold uppercase tracking-[0.2em]">Al-Hikmah</p>
         </div>
-        <button onClick={() => setIsMobileMenuOpen(false)} className="lg:hidden text-white/80 hover:text-white">
+        <button onClick={() => setIsMobileMenuOpen(false)} className="lg:hidden text-slate-400 hover:text-slate-600">
           <X size={24} />
         </button>
       </div>
-      <div className="p-4 space-y-1 overflow-y-auto h-[calc(100vh-140px)]">
-        <SidebarItem icon={Calendar} label="Dashboard" active={view === ViewState.DASHBOARD} onClick={() => { setView(ViewState.DASHBOARD); setIsMobileMenuOpen(false); }} />
+      
+      <div className="px-4 space-y-1.5">
+        <SidebarItem icon={Layers} label="Dashboard" active={view === ViewState.DASHBOARD} onClick={() => { setView(ViewState.DASHBOARD); setIsMobileMenuOpen(false); }} />
         <SidebarItem icon={Grid} label="Apps Hub" active={
           view === ViewState.HUB || 
           view === ViewState.QUIZ || 
@@ -328,34 +347,37 @@ const App = () => {
           view === ViewState.SALAH ||
           view === ViewState.FOODS
         } onClick={() => { setView(ViewState.HUB); setIsMobileMenuOpen(false); }} />
-        <div className="pt-4 pb-2 px-4 text-xs font-bold text-slate-400 uppercase tracking-wider">Core</div>
+        
+        <div className="pt-6 pb-3 px-4 text-[11px] font-bold text-slate-400 uppercase tracking-widest opacity-80">Knowledge</div>
         <SidebarItem icon={BookOpen} label="Read Quran" active={view === ViewState.QURAN_INDEX || view === ViewState.QURAN_READ} onClick={() => { setView(ViewState.QURAN_INDEX); setIsMobileMenuOpen(false); }} />
         <SidebarItem icon={MessageCircle} label="Hadith Collection" active={view === ViewState.HADITH} onClick={() => { setView(ViewState.HADITH); if(hadiths.length === 0) loadHadiths(); setIsMobileMenuOpen(false); }} />
         <SidebarItem icon={Hand} label="Ask Scholar AI" active={view === ViewState.SCHOLAR} onClick={() => { setView(ViewState.SCHOLAR); setIsMobileMenuOpen(false); }} />
       </div>
-      <div className="absolute bottom-0 w-full p-4 bg-slate-50 border-t border-slate-100">
-        <div className="flex items-center gap-3 mb-3">
-          <div className="w-10 h-10 rounded-full bg-emerald-200 flex items-center justify-center text-emerald-800 font-bold border-2 border-emerald-100">
+
+      <div className="absolute bottom-0 w-full p-6 border-t border-slate-100 bg-slate-50/50">
+        <div className="flex items-center gap-3 mb-4">
+          <div className="w-10 h-10 rounded-full bg-emerald-600 flex items-center justify-center text-white font-bold shadow-md border-2 border-white">
             {user?.username[0].toUpperCase()}
           </div>
           <div className="flex-1 min-w-0">
             <p className="text-sm font-bold text-slate-800 truncate">{user?.username}</p>
-            <p className="text-xs text-slate-500 flex items-center gap-1"><CheckCircle size={10} className="text-emerald-500"/> Synced</p>
+            <p className="text-[11px] text-slate-500">Standard Account</p>
           </div>
         </div>
-        <button onClick={handleLogout} className="flex items-center justify-center gap-2 text-red-500 hover:bg-red-50 py-2 w-full rounded-lg text-sm font-medium transition">
+        <button onClick={handleLogout} className="flex items-center justify-center gap-2 text-slate-500 hover:bg-red-50 hover:text-red-600 py-2.5 w-full rounded-xl text-sm font-medium transition duration-200">
           <LogOut size={16} /> Sign Out
         </button>
       </div>
     </div>
   );
 
-  const AppGridItem = ({ icon: Icon, label, color, onClick }: any) => (
-    <button onClick={onClick} className="flex flex-col items-center gap-3 p-6 bg-white rounded-2xl shadow-sm hover:shadow-lg border border-slate-100 transition-all hover:-translate-y-1 group">
-      <div className={`w-16 h-16 rounded-2xl flex items-center justify-center ${color} text-white shadow-md group-hover:scale-110 transition duration-300`}>
-        <Icon size={30} />
+  const AppGridItem = ({ icon: Icon, label, color, onClick, description }: any) => (
+    <button onClick={onClick} className="flex flex-col items-start p-5 bg-white rounded-2xl shadow-sm border border-slate-100 hover:shadow-md hover:border-emerald-100 transition-all hover:-translate-y-1 group h-full text-left">
+      <div className={`w-12 h-12 rounded-xl flex items-center justify-center ${color} text-white shadow-sm mb-4 group-hover:scale-110 transition duration-300`}>
+        <Icon size={24} />
       </div>
-      <span className="text-sm font-bold text-slate-700 text-center">{label}</span>
+      <span className="text-sm font-bold text-slate-700 mb-1">{label}</span>
+      {description && <span className="text-xs text-slate-400 leading-tight">{description}</span>}
     </button>
   );
 
@@ -363,63 +385,71 @@ const App = () => {
 
   if (view === ViewState.AUTH) {
     return (
-      <div className="min-h-screen flex items-center justify-center bg-[url('https://images.unsplash.com/photo-1542816417-0983c9c9ad53?ixlib=rb-4.0.3&auto=format&fit=crop&w=2000&q=80')] bg-cover bg-center">
-        <div className="absolute inset-0 bg-emerald-900/80 backdrop-blur-sm"></div>
-        <div className="relative bg-white/95 backdrop-blur-xl w-full max-w-md p-8 rounded-3xl shadow-2xl border border-white/20 m-4">
-          <div className="text-center mb-8">
-            <h1 className="text-5xl font-bold text-emerald-800 mb-2 font-arabic drop-shadow-sm">الحكمة</h1>
-            <p className="text-slate-500 font-medium">Al-Hikmah | Premium Companion</p>
+      <div className="min-h-screen flex items-center justify-center p-6 relative overflow-hidden">
+        {/* Simple geometric pattern background */}
+        <div className="absolute inset-0 bg-slate-50 z-0">
+            <div className="absolute top-0 left-0 w-full h-full opacity-5" style={{backgroundImage: 'radial-gradient(#10b981 1px, transparent 1px)', backgroundSize: '20px 20px'}}></div>
+        </div>
+
+        <div className="relative bg-white w-full max-w-md p-10 rounded-3xl shadow-xl border border-slate-100 z-10">
+          <div className="text-center mb-10">
+            <h1 className="text-6xl font-bold text-emerald-700 mb-3 font-arabic drop-shadow-sm">الحكمة</h1>
+            <p className="text-slate-400 text-xs font-bold uppercase tracking-[0.3em]">Al-Hikmah Companion</p>
           </div>
           
-          <div className="space-y-4">
+          <div className="space-y-5">
             {authError && (
-              <div className="bg-red-50 text-red-600 p-3 rounded-lg text-sm text-center font-medium animate-pulse">
-                {authError}
+              <div className="bg-red-50 border border-red-100 text-red-600 p-4 rounded-xl text-sm text-center font-medium animate-pulse flex items-center justify-center gap-2">
+                 <Info size={16} /> {authError}
               </div>
             )}
             
-            <div>
-              <label className="block text-xs font-bold text-slate-500 uppercase mb-1 ml-1">Username</label>
-              <div className="relative">
-                <span className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400"><CheckCircle size={18}/></span>
-                <input
-                  type="text"
-                  value={usernameInput}
-                  onChange={(e) => setUsernameInput(e.target.value)}
-                  className="w-full pl-10 pr-4 py-3 border border-slate-200 rounded-xl focus:ring-2 focus:ring-emerald-500 outline-none transition bg-slate-50 focus:bg-white"
-                  placeholder="Enter username"
-                />
+            <div className="space-y-4">
+              <div>
+                <label className="block text-xs font-bold text-slate-500 uppercase mb-2 ml-1">Username</label>
+                <div className="relative">
+                  <CheckCircle className="absolute left-4 top-1/2 -translate-y-1/2 text-slate-300" size={18}/>
+                  <input
+                    type="text"
+                    value={usernameInput}
+                    onChange={(e) => setUsernameInput(e.target.value)}
+                    className="w-full pl-11 pr-4 py-3.5 bg-slate-50 border border-slate-200 rounded-xl focus:ring-2 focus:ring-emerald-500/20 focus:border-emerald-500 outline-none transition"
+                    placeholder="Choose a username"
+                  />
+                </div>
               </div>
-            </div>
 
-            <div>
-              <label className="block text-xs font-bold text-slate-500 uppercase mb-1 ml-1">Password</label>
-              <div className="relative">
-                <Lock className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" size={18}/>
-                <input
-                  type="password"
-                  value={passwordInput}
-                  onChange={(e) => setPasswordInput(e.target.value)}
-                  className="w-full pl-10 pr-4 py-3 border border-slate-200 rounded-xl focus:ring-2 focus:ring-emerald-500 outline-none transition bg-slate-50 focus:bg-white"
-                  placeholder="Enter secure password"
-                />
+              <div>
+                <label className="block text-xs font-bold text-slate-500 uppercase mb-2 ml-1">Password</label>
+                <div className="relative">
+                  <Lock className="absolute left-4 top-1/2 -translate-y-1/2 text-slate-300" size={18}/>
+                  <input
+                    type="password"
+                    value={passwordInput}
+                    onChange={(e) => setPasswordInput(e.target.value)}
+                    className="w-full pl-11 pr-4 py-3.5 bg-slate-50 border border-slate-200 rounded-xl focus:ring-2 focus:ring-emerald-500/20 focus:border-emerald-500 outline-none transition"
+                    placeholder="Enter your password"
+                  />
+                </div>
               </div>
             </div>
 
             <button
               onClick={handleAuth}
               disabled={authLoading}
-              className="w-full bg-emerald-600 hover:bg-emerald-700 text-white font-bold py-3.5 rounded-xl transition shadow-lg shadow-emerald-200 disabled:opacity-50"
+              className="w-full bg-emerald-600 hover:bg-emerald-700 text-white font-bold py-4 rounded-xl transition shadow-lg shadow-emerald-200/50 disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center mt-2"
             >
-              {authLoading ? <Loader2 className="animate-spin mx-auto" /> : (isRegistering ? 'Create Account' : 'Sign In')}
+              {authLoading ? <Loader2 className="animate-spin" /> : (isRegistering ? 'Create Account' : 'Sign In')}
             </button>
             
-            <button 
-              onClick={() => { setIsRegistering(!isRegistering); setAuthError(''); }}
-              className="w-full text-slate-500 text-sm hover:text-emerald-600 transition py-2"
-            >
-              {isRegistering ? 'Already have an account? Sign In' : 'New here? Create Account'}
-            </button>
+            <div className="text-center mt-4">
+              <button 
+                onClick={() => { setIsRegistering(!isRegistering); setAuthError(''); }}
+                className="text-slate-500 text-sm hover:text-emerald-600 transition font-medium"
+              >
+                {isRegistering ? 'Already have an account? Sign In' : 'No account? Create one for free'}
+              </button>
+            </div>
           </div>
         </div>
       </div>
@@ -429,94 +459,155 @@ const App = () => {
   // --- Main View ---
 
   return (
-    <div className="flex min-h-screen bg-slate-50 font-sans">
+    <div className="flex min-h-screen font-sans text-slate-800">
       <Sidebar />
       
-      <main className="flex-1 lg:ml-72 p-4 lg:p-8 transition-all duration-300">
+      <main className="flex-1 lg:ml-72 p-4 sm:p-6 lg:p-10 transition-all duration-300">
         {/* Mobile Header */}
-        <div className="lg:hidden flex justify-between items-center mb-6 bg-white p-4 rounded-2xl shadow-sm">
+        <div className="lg:hidden flex justify-between items-center mb-6 bg-white/80 backdrop-blur-md p-4 rounded-2xl shadow-sm border border-slate-100 sticky top-4 z-40">
           <span className="font-bold text-emerald-800 font-arabic text-xl">الحكمة</span>
-          <button onClick={() => setIsMobileMenuOpen(true)} className="text-emerald-600">
-            <Menu size={28} />
+          <button onClick={() => setIsMobileMenuOpen(true)} className="text-slate-600">
+            <Menu size={24} />
           </button>
         </div>
 
         {/* Views */}
 
         {view === ViewState.DASHBOARD && (
-          <div className="max-w-4xl mx-auto space-y-8">
-            <header>
-              <h1 className="text-3xl font-bold text-slate-800">Welcome back, {user?.username}</h1>
-              <p className="text-slate-500">May this day bring you beneficial knowledge.</p>
+          <div className="max-w-6xl mx-auto space-y-8">
+            <header className="flex justify-between items-end pb-2 border-b border-slate-100">
+              <div>
+                <h1 className="text-2xl font-bold text-slate-800 mb-1">Salam, {user?.username}</h1>
+                <p className="text-slate-400 text-sm">Here is your daily Islamic summary.</p>
+              </div>
+              <div className="hidden sm:block text-right">
+                <p className="font-arabic text-xl text-emerald-600">بسم الله الرحمن الرحيم</p>
+              </div>
             </header>
 
-            <div className="grid md:grid-cols-2 gap-6">
-              <div className="bg-gradient-to-br from-emerald-500 to-teal-600 rounded-3xl p-8 text-white shadow-xl relative overflow-hidden">
-                <BookOpen className="absolute top-4 right-4 opacity-20" size={80} />
-                <p className="text-emerald-100 uppercase text-xs font-bold tracking-wider mb-2">Continue Reading</p>
-                <h3 className="text-3xl font-bold font-arabic mb-1">{SURAHS[(user?.lastReadSurah || 1) - 1].name}</h3>
-                <p className="text-emerald-50 mb-6">{SURAHS[(user?.lastReadSurah || 1) - 1].englishName}</p>
-                <button 
-                  onClick={() => loadSurah(user?.lastReadSurah || 1)}
-                  className="bg-white text-emerald-600 px-6 py-2 rounded-full font-bold hover:bg-emerald-50 transition shadow-lg"
-                >
-                  Resume Surah
-                </button>
+            <div className="grid lg:grid-cols-3 gap-6">
+              {/* Hero Card */}
+              <div className="lg:col-span-2 bg-gradient-to-br from-emerald-600 to-teal-700 rounded-3xl p-8 text-white shadow-xl shadow-emerald-100 relative overflow-hidden group">
+                <div className="absolute top-0 right-0 p-12 opacity-10 transform group-hover:scale-110 transition duration-700">
+                   <BookOpen size={140} />
+                </div>
+                <div className="relative z-10">
+                    <span className="inline-block px-3 py-1 rounded-full bg-white/20 backdrop-blur-sm text-xs font-bold uppercase tracking-wider mb-4 border border-white/10">
+                        Continue Reading
+                    </span>
+                    <h3 className="text-4xl font-bold font-arabic mb-2">{SURAHS[(user?.lastReadSurah || 1) - 1].name}</h3>
+                    <p className="text-emerald-100 text-lg mb-8 font-medium">{SURAHS[(user?.lastReadSurah || 1) - 1].englishName} <span className="opacity-50">•</span> Ayah {user?.lastReadAyah || 1}</p>
+                    
+                    <div className="flex gap-3">
+                        <button 
+                        onClick={() => loadSurah(user?.lastReadSurah || 1)}
+                        className="bg-white text-emerald-700 px-6 py-3 rounded-xl font-bold hover:bg-emerald-50 transition shadow-lg flex items-center gap-2"
+                        >
+                        <PlayCircle size={20} /> Resume
+                        </button>
+                        <button onClick={() => setView(ViewState.QURAN_INDEX)} className="bg-emerald-800/50 text-white px-6 py-3 rounded-xl font-bold hover:bg-emerald-800/70 transition backdrop-blur-sm">
+                            Full Index
+                        </button>
+                    </div>
+                </div>
               </div>
 
-              <div className="bg-white rounded-3xl p-8 shadow-sm border border-slate-100 flex flex-col justify-center relative overflow-hidden">
-                <Brain className="absolute -bottom-4 -right-4 text-purple-50 opacity-50" size={120} />
-                <h3 className="text-xl font-bold text-slate-800 mb-2">Test Your Knowledge</h3>
-                <p className="text-slate-500 mb-6 text-sm">Take a quick quiz on Seerah, Fiqh, and Quran.</p>
-                <div className="flex items-center gap-4">
-                   <div className="flex-1 bg-slate-100 h-2 rounded-full overflow-hidden">
-                     <div className="bg-purple-500 h-full w-0 transition-all" style={{width: `${Math.min(user?.quizScore || 0, 100)}%`}}></div>
-                   </div>
-                   <span className="text-xs font-bold text-purple-600">{user?.quizScore} pts</span>
+              {/* Stats Column */}
+              <div className="space-y-4 flex flex-col">
+                <div className="flex-1 bg-white p-6 rounded-3xl border border-slate-100 shadow-sm flex flex-col justify-center relative overflow-hidden">
+                    <div className="relative z-10">
+                        <div className="flex items-center justify-between mb-4">
+                            <h3 className="font-bold text-slate-700">Knowledge Score</h3>
+                            <Brain className="text-purple-500" size={24} />
+                        </div>
+                        <div className="text-4xl font-bold text-slate-800 mb-2">{user?.quizScore || 0}</div>
+                        <p className="text-xs text-slate-400 mb-4">Points earned from quizzes</p>
+                        <button onClick={startQuiz} className="w-full py-2.5 bg-purple-50 text-purple-600 rounded-xl text-sm font-bold hover:bg-purple-100 transition">
+                            Take a Quiz
+                        </button>
+                    </div>
                 </div>
-                <button onClick={startQuiz} className="mt-6 w-full bg-purple-50 text-purple-600 py-2 rounded-lg font-bold hover:bg-purple-100 transition">Start Quiz</button>
+                
+                 <div className="bg-white p-6 rounded-3xl border border-slate-100 shadow-sm flex items-center justify-between">
+                    <div>
+                        <p className="text-slate-400 text-xs font-bold uppercase">Tasbih Count</p>
+                        <p className="text-3xl font-bold text-teal-600 mt-1">{tasbihCount}</p>
+                    </div>
+                    <button onClick={() => setView(ViewState.TASBIH)} className="w-12 h-12 rounded-full bg-teal-50 flex items-center justify-center text-teal-600 hover:bg-teal-100 transition">
+                        <ChevronRight size={20} />
+                    </button>
+                 </div>
               </div>
+            </div>
+            
+            {/* Quick Access Grid */}
+            <div>
+                <h3 className="text-lg font-bold text-slate-800 mb-4">Quick Tools</h3>
+                <div className="grid grid-cols-2 sm:grid-cols-4 gap-4">
+                    <button onClick={() => setView(ViewState.SALAH)} className="bg-white p-4 rounded-2xl border border-slate-100 shadow-sm hover:border-emerald-200 hover:shadow-md transition text-left">
+                        <AlignLeft className="text-green-500 mb-3" size={24} />
+                        <p className="font-bold text-slate-700 text-sm">Salah Guide</p>
+                    </button>
+                    <button onClick={() => setView(ViewState.DUA)} className="bg-white p-4 rounded-2xl border border-slate-100 shadow-sm hover:border-blue-200 hover:shadow-md transition text-left">
+                        <Coffee className="text-blue-500 mb-3" size={24} />
+                        <p className="font-bold text-slate-700 text-sm">Daily Dua</p>
+                    </button>
+                    <button onClick={() => setView(ViewState.SCHOLAR)} className="bg-white p-4 rounded-2xl border border-slate-100 shadow-sm hover:border-emerald-200 hover:shadow-md transition text-left">
+                        <Hand className="text-emerald-500 mb-3" size={24} />
+                        <p className="font-bold text-slate-700 text-sm">Ask Scholar</p>
+                    </button>
+                    <button onClick={() => setView(ViewState.FOODS)} className="bg-white p-4 rounded-2xl border border-slate-100 shadow-sm hover:border-orange-200 hover:shadow-md transition text-left">
+                        <Utensils className="text-orange-500 mb-3" size={24} />
+                        <p className="font-bold text-slate-700 text-sm">Sunnah Foods</p>
+                    </button>
+                </div>
             </div>
           </div>
         )}
 
         {view === ViewState.QURAN_INDEX && (
-          <div className="max-w-5xl mx-auto">
-            <div className="flex items-center gap-4 mb-8">
-              <div className="relative flex-1">
+          <div className="max-w-6xl mx-auto">
+            <div className="flex flex-col md:flex-row md:items-center gap-6 mb-10">
+              <div>
+                 <h2 className="text-3xl font-bold text-slate-800 mb-1">Noble Quran</h2>
+                 <p className="text-slate-400">Index of all 114 Surahs</p>
+              </div>
+              <div className="relative flex-1 max-w-md md:ml-auto">
                 <Search className="absolute left-4 top-1/2 -translate-y-1/2 text-slate-400" size={20} />
                 <input 
                   type="text" 
-                  placeholder="Search Surah name or number..." 
-                  className="w-full pl-12 pr-4 py-3 rounded-2xl border border-slate-200 focus:ring-2 focus:ring-emerald-500 outline-none"
+                  placeholder="Search by name or number..." 
+                  className="w-full pl-11 pr-4 py-3 rounded-xl bg-white border border-slate-200 focus:ring-2 focus:ring-emerald-500/20 focus:border-emerald-500 outline-none shadow-sm transition"
                   value={searchTerm}
                   onChange={(e) => setSearchTerm(e.target.value)}
                 />
               </div>
             </div>
             
-            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4">
               {SURAHS.filter(s => 
                 s.englishName.toLowerCase().includes(searchTerm.toLowerCase()) || 
-                s.number.toString().includes(searchTerm)
+                s.number.toString().includes(searchTerm) ||
+                s.name.includes(searchTerm)
               ).map((surah) => (
                 <button
                   key={surah.number}
                   onClick={() => loadSurah(surah.number)}
-                  className="bg-white p-5 rounded-2xl shadow-sm hover:shadow-md transition border border-slate-100 text-left flex items-center justify-between group"
+                  className="bg-white p-5 rounded-2xl shadow-sm border border-slate-100 hover:shadow-md hover:border-emerald-100 hover:-translate-y-0.5 transition-all text-left flex items-center justify-between group relative overflow-hidden"
                 >
-                  <div className="flex items-center gap-4">
-                    <div className="w-10 h-10 rounded-full bg-slate-50 text-slate-400 flex items-center justify-center font-bold text-sm group-hover:bg-emerald-500 group-hover:text-white transition">
+                  <div className="absolute top-0 right-0 w-16 h-16 bg-emerald-50 rounded-bl-full -mr-8 -mt-8 transition-all group-hover:bg-emerald-100"></div>
+                  
+                  <div className="flex items-center gap-4 z-10">
+                    <div className="w-10 h-10 rounded-xl bg-slate-50 text-slate-400 flex items-center justify-center font-bold text-sm group-hover:bg-emerald-600 group-hover:text-white transition duration-300 border border-slate-100">
                       {surah.number}
                     </div>
                     <div>
-                      <h3 className="font-bold text-slate-800">{surah.englishName}</h3>
-                      <p className="text-xs text-slate-500">{surah.englishNameTranslation}</p>
+                      <h3 className="font-bold text-slate-800 leading-tight mb-0.5">{surah.englishName}</h3>
+                      <p className="text-[11px] text-slate-400 uppercase tracking-wide">{surah.revelationType} • {surah.numberOfAyahs}</p>
                     </div>
                   </div>
-                  <div className="text-right">
-                    <span className="font-arabic text-xl text-slate-700 block">{surah.name}</span>
-                    <span className="text-xs text-slate-400">{surah.numberOfAyahs} Ayahs</span>
+                  <div className="z-10">
+                    <span className="font-arabic text-xl text-emerald-800/80 group-hover:text-emerald-800 transition">{surah.name}</span>
                   </div>
                 </button>
               ))}
@@ -525,127 +616,167 @@ const App = () => {
         )}
 
         {view === ViewState.QURAN_READ && (
-          <div className="max-w-3xl mx-auto bg-white min-h-[80vh] rounded-3xl shadow-sm border border-slate-100 p-8 relative">
-            <button onClick={() => setView(ViewState.QURAN_INDEX)} className="absolute top-6 left-6 text-slate-400 hover:text-emerald-600 transition">
-              <ArrowLeft size={24} />
-            </button>
-            
-            <div className="text-center mb-10 pt-4">
-              <h2 className="font-arabic text-4xl mb-2 text-slate-800">{SURAHS[currentSurah - 1].name}</h2>
-              <p className="text-slate-500">{SURAHS[currentSurah - 1].englishName} • {SURAHS[currentSurah - 1].revelationType}</p>
-            </div>
+          <div className="max-w-4xl mx-auto">
+            {/* Sticky Header */}
+             <div className="sticky top-0 z-30 bg-white/90 backdrop-blur-md border-b border-slate-100 mb-8 -mx-4 sm:-mx-6 lg:-mx-10 px-4 sm:px-6 lg:px-10 py-4 flex items-center justify-between shadow-sm">
+                <button onClick={() => setView(ViewState.QURAN_INDEX)} className="p-2 -ml-2 rounded-full hover:bg-slate-100 text-slate-500 transition">
+                  <ArrowLeft size={22} />
+                </button>
+                <div className="text-center">
+                  <h2 className="font-bold text-slate-800">{SURAHS[currentSurah - 1].englishName}</h2>
+                  <p className="text-xs text-slate-400 font-arabic">{SURAHS[currentSurah - 1].name}</p>
+                </div>
+                <div className="w-10"></div> {/* Spacer for centering */}
+             </div>
 
-            {loadingAyahs ? <Loading /> : (
-              <div className="space-y-10">
-                {ayahs.map((ayah) => (
-                  <div key={ayah.numberInSurah} className="border-b border-slate-50 pb-8 last:border-0">
-                    <div className="flex justify-between items-start mb-4">
-                      <span className="w-8 h-8 rounded-full bg-emerald-50 text-emerald-600 flex items-center justify-center text-sm font-bold">
-                        {ayah.numberInSurah}
-                      </span>
-                      <div className="flex gap-2">
-                        <button onClick={() => handleViewTafsir(ayah.numberInSurah)} className="p-2 rounded-full hover:bg-slate-50 text-slate-400 hover:text-emerald-600 transition" title="Tafsir">
-                          <BookOpen size={18} />
-                        </button>
-                      </div>
-                    </div>
-                    
-                    <p className="text-right font-arabic text-3xl leading-[2.5] mb-6 text-slate-800">
-                      {ayah.text}
-                    </p>
-                    <p className="text-slate-600 text-lg mb-2">{ayah.translation}</p>
-                    <p className="text-slate-400 text-sm italic">{ayah.transliteration}</p>
+            <div className="bg-white rounded-3xl shadow-sm border border-slate-100 min-h-[80vh] p-8 sm:p-12 relative">
+              
+              {/* Bismillah (except Surah 9) */}
+              {currentSurah !== 9 && (
+                 <div className="text-center mb-16 mt-4">
+                    <p className="font-arabic text-4xl sm:text-5xl text-slate-800 leading-relaxed">{BISMILLAH}</p>
+                 </div>
+              )}
 
-                    {selectedAyahForTafsir === ayah.numberInSurah && (
-                      <div className="mt-6 bg-amber-50 p-6 rounded-2xl border border-amber-100">
-                        <div className="flex items-center gap-2 mb-3 text-amber-800 font-bold">
-                           <Book size={18} /> Tafsir (Analysis)
+              {loadingAyahs ? <Loading /> : (
+                <div className="space-y-2">
+                  {ayahs.map((ayah, idx) => (
+                    <React.Fragment key={ayah.numberInSurah}>
+                        <div className="group relative py-6 transition-colors hover:bg-slate-50/50 rounded-3xl px-4 -mx-4">
+                            {/* Actions Toolbar */}
+                            <div className="absolute top-6 left-4 opacity-0 group-hover:opacity-100 transition-opacity flex gap-2">
+                                <button onClick={() => handleViewTafsir(ayah.numberInSurah)} className={`p-2 rounded-full transition shadow-sm border ${selectedAyahForTafsir === ayah.numberInSurah ? 'bg-amber-100 text-amber-700 border-amber-200' : 'bg-white text-slate-400 border-slate-200 hover:text-emerald-600'}`} title="Tafsir">
+                                    <BookOpen size={16} />
+                                </button>
+                                <span className="w-8 h-8 rounded-full bg-emerald-50 text-emerald-700 border border-emerald-100 flex items-center justify-center text-xs font-bold">
+                                    {ayah.numberInSurah}
+                                </span>
+                            </div>
+
+                            {/* Content */}
+                            <div className="space-y-8 pl-0 sm:pl-12">
+                                <p className="text-right font-arabic text-4xl sm:text-5xl leading-[2.2] text-slate-800" dir="rtl">
+                                    {ayah.text}
+                                </p>
+                                <div className="space-y-2">
+                                    <p className="text-slate-700 text-lg sm:text-xl font-serif leading-relaxed">{ayah.translation}</p>
+                                    <p className="text-slate-400 text-sm italic">{ayah.transliteration}</p>
+                                </div>
+                            </div>
+
+                            {/* Tafsir Panel */}
+                            {selectedAyahForTafsir === ayah.numberInSurah && (
+                                <div className="mt-8 ml-0 sm:ml-12 bg-amber-50 p-6 rounded-2xl border border-amber-100 animate-in slide-in-from-top-2">
+                                    <div className="flex items-center gap-2 mb-3 text-amber-800 font-bold border-b border-amber-200/50 pb-2">
+                                        <Book size={18} /> Tafsir (Explanation)
+                                    </div>
+                                    {loadingTafsir ? <div className="py-4 flex justify-center text-amber-600"><Loader2 className="animate-spin" /></div> : (
+                                        <p className="text-amber-900 leading-loose text-base text-justify">{tafsirContent}</p>
+                                    )}
+                                </div>
+                            )}
                         </div>
-                        {loadingTafsir ? <Loader2 className="animate-spin text-amber-600" /> : (
-                          <p className="text-amber-900 leading-relaxed text-sm">{tafsirContent}</p>
+                        {/* Ornamental Divider */}
+                        {idx < ayahs.length - 1 && (
+                           <div className="ornament-divider"><span className="text-emerald-200 text-xl">۞</span></div>
                         )}
-                      </div>
-                    )}
-                  </div>
-                ))}
-              </div>
-            )}
+                    </React.Fragment>
+                  ))}
+                </div>
+              )}
+            </div>
           </div>
         )}
 
         {view === ViewState.SCHOLAR && (
-           <div className="max-w-3xl mx-auto flex flex-col h-[calc(100vh-6rem)] bg-white rounded-3xl shadow-sm border border-slate-100 overflow-hidden">
-             <div className="p-6 border-b border-slate-100 bg-emerald-50/50">
-               <div className="flex items-center gap-3">
-                 <div className="w-12 h-12 rounded-full bg-emerald-100 flex items-center justify-center text-emerald-700">
+           <div className="max-w-4xl mx-auto flex flex-col h-[calc(100vh-6rem)] bg-white rounded-3xl shadow-lg shadow-slate-200/50 border border-slate-100 overflow-hidden">
+             {/* Header */}
+             <div className="p-6 border-b border-slate-100 bg-emerald-50/30 flex justify-between items-center">
+               <div className="flex items-center gap-4">
+                 <div className="w-12 h-12 rounded-full bg-gradient-to-br from-emerald-500 to-teal-600 flex items-center justify-center text-white shadow-md">
                    <Hand size={24} />
                  </div>
                  <div>
-                   <h2 className="font-bold text-slate-800">AI Scholar (Hanafi)</h2>
-                   <p className="text-xs text-slate-500">Ask Fiqh, History, or Advice.</p>
+                   <h2 className="font-bold text-slate-800 text-lg">AI Scholar (Hanafi)</h2>
+                   <p className="text-xs text-emerald-600 font-medium uppercase tracking-wide">Online & Ready</p>
                  </div>
                </div>
              </div>
 
-             <div className="flex-1 overflow-y-auto p-6 space-y-6">
+             {/* Chat Area */}
+             <div className="flex-1 overflow-y-auto p-6 space-y-8 bg-slate-50/30">
                {chatHistory.length === 0 && (
-                 <div className="text-center text-slate-400 mt-10">
-                   <Info size={48} className="mx-auto mb-4 opacity-20" />
-                   <p>Ask a question to begin...</p>
+                 <div className="text-center text-slate-400 mt-20 max-w-sm mx-auto">
+                   <div className="w-20 h-20 bg-slate-100 rounded-full flex items-center justify-center mx-auto mb-6">
+                      <Sparkles size={32} className="text-slate-300" />
+                   </div>
+                   <h3 className="text-slate-700 font-bold mb-2">How can I help you?</h3>
+                   <p className="text-sm mb-8">Ask about Fiqh, History, or get advice based on the Quran and Sunnah.</p>
+                   <div className="grid grid-cols-1 gap-3">
+                      <button onClick={() => setChatInput("Is seafood halal?")} className="text-xs bg-white border border-slate-200 p-3 rounded-xl hover:border-emerald-400 transition">"Is seafood halal in Hanafi school?"</button>
+                      <button onClick={() => setChatInput("Explain the conditions of Wudu")} className="text-xs bg-white border border-slate-200 p-3 rounded-xl hover:border-emerald-400 transition">"Explain the conditions of Wudu"</button>
+                   </div>
                  </div>
                )}
+               
                {chatHistory.map((msg, idx) => (
-                 <div key={idx} className={`flex ${msg.role === 'user' ? 'justify-end' : 'justify-start'}`}>
-                   <div className={`max-w-[85%] p-5 rounded-2xl ${
+                 <div key={idx} className={`flex ${msg.role === 'user' ? 'justify-end' : 'justify-start'} animate-in fade-in slide-in-from-bottom-2`}>
+                    {msg.role === 'model' && (
+                         <div className="w-8 h-8 rounded-full bg-emerald-100 flex-shrink-0 flex items-center justify-center text-emerald-700 mr-3 mt-2">
+                             <Hand size={14} />
+                         </div>
+                    )}
+                   <div className={`max-w-[80%] p-5 rounded-2xl shadow-sm ${
                      msg.role === 'user' 
-                       ? 'bg-emerald-600 text-white rounded-tr-none shadow-md' 
-                       : 'bg-slate-100 text-slate-800 rounded-tl-none'
+                       ? 'bg-emerald-600 text-white rounded-tr-none' 
+                       : 'bg-white text-slate-700 border border-slate-100 rounded-tl-none'
                    }`}>
                      {msg.role === 'model' ? (
-                        <div>
+                        <div className="prose prose-sm max-w-none prose-emerald">
                             {msg.text.includes('|||') ? (
                                 <>
-                                    <p className="font-bold text-lg mb-3 border-b border-slate-200/50 pb-2">
+                                    <p className="font-bold text-base text-slate-900 mb-4 border-b border-slate-100 pb-3">
                                         {msg.text.split('|||')[0]}
                                     </p>
-                                    <p className="text-sm leading-relaxed opacity-90">
+                                    <p className="text-slate-600 leading-relaxed">
                                         {msg.text.split('|||')[1]}
                                     </p>
                                 </>
                             ) : <p>{msg.text}</p>}
                         </div>
                      ) : (
-                        <p>{msg.text}</p>
+                        <p className="leading-relaxed">{msg.text}</p>
                      )}
                    </div>
                  </div>
                ))}
                {isChatLoading && (
-                 <div className="flex justify-start">
-                   <div className="bg-slate-50 p-4 rounded-2xl rounded-tl-none flex items-center gap-2 text-slate-500 text-sm">
-                     <Loader2 className="animate-spin" size={16} /> Thinking...
+                 <div className="flex justify-start ml-11">
+                   <div className="bg-white border border-slate-100 px-4 py-3 rounded-2xl rounded-tl-none flex items-center gap-2 text-slate-500 text-sm shadow-sm">
+                     <Loader2 className="animate-spin text-emerald-500" size={16} /> Thinking...
                    </div>
                  </div>
                )}
                <div ref={chatEndRef} />
              </div>
 
-             <div className="p-4 border-t border-slate-100 bg-slate-50">
-               <div className="flex gap-2">
+             {/* Input Area */}
+             <div className="p-4 bg-white border-t border-slate-100">
+               <div className="flex gap-3">
                  <input
                    type="text"
                    value={chatInput}
                    onChange={(e) => setChatInput(e.target.value)}
                    onKeyDown={(e) => e.key === 'Enter' && handleScholarChat()}
-                   placeholder="Is seafood halal in Hanafi school?"
-                   className="flex-1 px-4 py-3 rounded-xl border border-slate-200 focus:ring-2 focus:ring-emerald-500 outline-none"
+                   placeholder="Type your question..."
+                   className="flex-1 px-5 py-4 rounded-2xl bg-slate-50 border border-slate-200 focus:ring-2 focus:ring-emerald-500/20 focus:border-emerald-500 outline-none transition"
                  />
                  <button 
                    onClick={handleScholarChat}
-                   disabled={isChatLoading}
-                   className="bg-emerald-600 text-white p-3 rounded-xl hover:bg-emerald-700 transition disabled:opacity-50"
+                   disabled={isChatLoading || !chatInput.trim()}
+                   className="bg-emerald-600 text-white p-4 rounded-2xl hover:bg-emerald-700 transition shadow-lg shadow-emerald-200 disabled:opacity-50 disabled:shadow-none"
                  >
-                   <Send size={20} />
+                   <Send size={22} />
                  </button>
                </div>
              </div>
@@ -653,102 +784,159 @@ const App = () => {
         )}
 
         {view === ViewState.HADITH && (
-          <div className="max-w-4xl mx-auto">
-             <div className="flex justify-between items-end mb-8">
+          <div className="max-w-5xl mx-auto">
+             <div className="flex flex-col sm:flex-row justify-between items-end mb-10 gap-4">
                <div>
-                 <h2 className="text-2xl font-bold text-slate-800">Hadith Collection</h2>
-                 <p className="text-slate-500">Authentic narrations from Kutub al-Sittah</p>
+                 <h2 className="text-3xl font-bold text-slate-800 mb-2">Hadith Collection</h2>
+                 <p className="text-slate-500">Authentic narrations derived from the Kutub al-Sittah</p>
                </div>
-               <select 
-                 value={hadithTopic} 
-                 onChange={(e) => setHadithTopic(e.target.value)}
-                 className="px-4 py-2 rounded-lg border border-slate-200 bg-white text-sm"
-               >
-                 <option value="faith">Faith (Iman)</option>
-                 <option value="prayer">Prayer (Salah)</option>
-                 <option value="charity">Charity (Zakat)</option>
-                 <option value="manners">Manners (Adab)</option>
-                 <option value="marriage">Marriage</option>
-               </select>
+               <div className="flex items-center gap-2 bg-white p-1 pr-4 rounded-xl border border-slate-200 shadow-sm">
+                 <div className="bg-emerald-100 text-emerald-700 p-2 rounded-lg"><Layers size={18}/></div>
+                 <select 
+                   value={hadithTopic} 
+                   onChange={(e) => setHadithTopic(e.target.value)}
+                   className="bg-transparent border-none outline-none text-sm font-bold text-slate-700 cursor-pointer"
+                 >
+                   <option value="faith">Faith (Iman)</option>
+                   <option value="prayer">Prayer (Salah)</option>
+                   <option value="charity">Charity (Zakat)</option>
+                   <option value="manners">Manners (Adab)</option>
+                   <option value="marriage">Marriage</option>
+                 </select>
+               </div>
              </div>
 
-             <div className="space-y-6">
+             <div className="grid gap-6">
                {loadingHadiths ? <Loading /> : hadiths.map((h) => (
-                 <div key={h.id} className="bg-white p-8 rounded-3xl shadow-sm border border-slate-100">
-                   <div className="flex justify-between items-start mb-4">
-                     <span className="bg-emerald-100 text-emerald-700 px-3 py-1 rounded-full text-xs font-bold uppercase tracking-wider">
+                 <div key={h.id} className="bg-white p-8 rounded-3xl shadow-sm border border-slate-100 hover:shadow-md transition group">
+                   <div className="flex justify-between items-start mb-6">
+                     <span className="bg-emerald-50 text-emerald-700 px-3 py-1.5 rounded-lg text-xs font-bold uppercase tracking-wider border border-emerald-100">
                        {h.source}
                      </span>
-                     <span className="text-slate-400 text-sm">{h.grade}</span>
+                     <span className="text-slate-400 text-xs font-medium bg-slate-50 px-2 py-1 rounded">{h.grade}</span>
                    </div>
-                   <p className="text-right font-arabic text-2xl mb-4 text-slate-700 leading-relaxed">{h.arabic}</p>
-                   <p className="text-slate-800 text-lg mb-2 font-serif leading-relaxed">"{h.english}"</p>
-                   <p className="text-slate-400 text-sm italic">— Narrated by {h.narrator}</p>
+                   <p className="text-right font-arabic text-2xl sm:text-3xl mb-6 text-slate-700 leading-loose" dir="rtl">{h.arabic}</p>
+                   <div className="pl-4 border-l-4 border-emerald-500/20">
+                      <p className="text-slate-800 text-lg font-medium leading-relaxed italic">"{h.english}"</p>
+                   </div>
+                   <p className="text-slate-400 text-sm mt-4 font-medium flex items-center gap-2">
+                      <span className="w-6 h-[1px] bg-slate-300"></span> Narrated by {h.narrator}
+                   </p>
                  </div>
                ))}
-               <button onClick={loadHadiths} className="w-full py-4 bg-white border border-dashed border-slate-300 text-slate-500 rounded-2xl hover:bg-slate-50 transition font-medium">
-                 Load More Hadiths
-               </button>
+               
+               {hadiths.length === 0 && !loadingHadiths && (
+                  <div className="text-center py-20 bg-white rounded-3xl border border-dashed border-slate-200">
+                     <p className="text-slate-400 mb-4">Select a topic to begin reading</p>
+                     <button onClick={loadHadiths} className="bg-emerald-600 text-white px-6 py-3 rounded-xl font-bold hover:bg-emerald-700 transition">
+                        Load Hadiths
+                     </button>
+                  </div>
+               )}
+
+               {hadiths.length > 0 && (
+                <button onClick={loadHadiths} className="w-full py-4 bg-white border border-slate-200 text-emerald-700 rounded-2xl hover:bg-emerald-50 hover:border-emerald-200 transition font-bold shadow-sm">
+                    Load More Narrations
+                </button>
+               )}
              </div>
           </div>
         )}
 
         {view === ViewState.HUB && (
-          <div className="max-w-5xl mx-auto">
-            <h2 className="text-3xl font-bold text-slate-800 mb-8">Apps Hub</h2>
-            <div className="grid grid-cols-2 md:grid-cols-4 gap-6">
-              <AppGridItem icon={Calculator} label="Zakat Calc" color="bg-amber-500" onClick={() => setView(ViewState.ZAKAT)} />
-              <AppGridItem icon={Brain} label="Islamic Quiz" color="bg-purple-500" onClick={startQuiz} />
-              <AppGridItem icon={Moon} label="Dream Meanings" color="bg-indigo-500" onClick={() => setView(ViewState.DREAM)} />
-              <AppGridItem icon={Utensils} label="Halal Check" color="bg-rose-500" onClick={() => setView(ViewState.HALAL)} />
-              <AppGridItem icon={Compass} label="Digital Tasbih" color="bg-teal-500" onClick={() => setView(ViewState.TASBIH)} />
-              <AppGridItem icon={Heart} label="99 Names" color="bg-pink-500" onClick={() => setView(ViewState.NAMES)} />
-              
-              {/* New Apps */}
-              <AppGridItem icon={Coffee} label="Fortress of Dua" color="bg-blue-500" onClick={() => setView(ViewState.DUA)} />
-              <AppGridItem icon={AlignLeft} label="Salah Guide" color="bg-green-500" onClick={() => setView(ViewState.SALAH)} />
-              <AppGridItem icon={Utensils} label="Sunnah Foods" color="bg-orange-500" onClick={() => setView(ViewState.FOODS)} />
+          <div className="max-w-6xl mx-auto">
+            <header className="mb-10">
+                <h2 className="text-3xl font-bold text-slate-800 mb-2">Apps Hub</h2>
+                <p className="text-slate-500">Tools for your daily spiritual life and knowledge.</p>
+            </header>
+
+            <div className="space-y-10">
+                {/* Worship Section */}
+                <section>
+                    <h3 className="text-sm font-bold text-slate-400 uppercase tracking-widest mb-6 flex items-center gap-2">
+                        <Layers size={16}/> Worship Tools
+                    </h3>
+                    <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-4 gap-5">
+                        <AppGridItem icon={AlignLeft} label="Salah Guide" description="Step-by-step prayer" color="bg-green-500" onClick={() => setView(ViewState.SALAH)} />
+                        <AppGridItem icon={Coffee} label="Fortress of Dua" description="Daily supplications" color="bg-blue-500" onClick={() => setView(ViewState.DUA)} />
+                        <AppGridItem icon={Compass} label="Digital Tasbih" description="Dhikr counter" color="bg-teal-500" onClick={() => setView(ViewState.TASBIH)} />
+                        <AppGridItem icon={Calculator} label="Zakat Calc" description="2.5% wealth check" color="bg-amber-500" onClick={() => setView(ViewState.ZAKAT)} />
+                    </div>
+                </section>
+
+                {/* Knowledge Section */}
+                <section>
+                    <h3 className="text-sm font-bold text-slate-400 uppercase tracking-widest mb-6 flex items-center gap-2">
+                        <BookOpen size={16}/> Knowledge & Learning
+                    </h3>
+                    <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-4 gap-5">
+                        <AppGridItem icon={Brain} label="Islamic Quiz" description="Test your knowledge" color="bg-purple-500" onClick={startQuiz} />
+                        <AppGridItem icon={Heart} label="99 Names" description="Asma ul Husna" color="bg-pink-500" onClick={() => setView(ViewState.NAMES)} />
+                    </div>
+                </section>
+
+                {/* Lifestyle Section */}
+                <section>
+                    <h3 className="text-sm font-bold text-slate-400 uppercase tracking-widest mb-6 flex items-center gap-2">
+                        <Sparkles size={16}/> Lifestyle
+                    </h3>
+                    <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-4 gap-5">
+                        <AppGridItem icon={Moon} label="Dream Meanings" description="Islamic interpretation" color="bg-indigo-500" onClick={() => setView(ViewState.DREAM)} />
+                        <AppGridItem icon={Utensils} label="Halal Check" description="Ingredient scanner" color="bg-rose-500" onClick={() => setView(ViewState.HALAL)} />
+                        <AppGridItem icon={Utensils} label="Sunnah Foods" description="Prophetic diet" color="bg-orange-500" onClick={() => setView(ViewState.FOODS)} />
+                    </div>
+                </section>
             </div>
           </div>
         )}
 
         {view === ViewState.QUIZ && (
-          <div className="max-w-2xl mx-auto">
-            <button onClick={() => setView(ViewState.HUB)} className="mb-6 text-slate-500 hover:text-slate-800 flex items-center gap-2"><ArrowLeft size={18}/> Back to Hub</button>
+          <div className="max-w-2xl mx-auto pt-8">
+            <button onClick={() => setView(ViewState.HUB)} className="mb-6 text-slate-400 hover:text-slate-800 flex items-center gap-2 text-sm font-bold"><ArrowLeft size={16}/> Back to Hub</button>
             
             {isChatLoading ? <Loading /> : quizQuestions.length > 0 && (
-              <div className="bg-white rounded-3xl shadow-lg overflow-hidden">
-                <div className="bg-purple-600 p-8 text-white text-center">
-                  <div className="flex justify-between items-center mb-4 opacity-80 text-sm">
-                    <span>Question {currentQuestionIndex + 1} of {quizQuestions.length}</span>
-                    <span>Score: {quizScore}</span>
+              <div className="bg-white rounded-3xl shadow-xl border border-slate-100 overflow-hidden">
+                <div className="bg-purple-600 p-8 text-white text-center relative overflow-hidden">
+                  <div className="absolute inset-0 bg-purple-900/20"></div>  
+                  <div className="relative z-10">
+                    <div className="flex justify-between items-center mb-6 opacity-90 text-xs font-bold uppercase tracking-wider">
+                        <span>Question {currentQuestionIndex + 1} / {quizQuestions.length}</span>
+                        <span className="bg-white/20 px-3 py-1 rounded-full">Score: {quizScore}</span>
+                    </div>
+                    <h2 className="text-2xl font-bold leading-tight mb-2">{quizQuestions[currentQuestionIndex].question}</h2>
                   </div>
-                  <h2 className="text-2xl font-bold leading-tight">{quizQuestions[currentQuestionIndex].question}</h2>
                 </div>
                 
-                <div className="p-8 space-y-4">
+                <div className="p-8 space-y-3">
                   {quizQuestions[currentQuestionIndex].options.map((opt, idx) => {
-                    let btnClass = "w-full p-4 rounded-xl border-2 text-left transition-all font-medium ";
+                    let btnClass = "w-full p-5 rounded-2xl border-2 text-left transition-all font-medium flex items-center justify-between group ";
                     if (quizState.answered) {
                       if (idx === quizQuestions[currentQuestionIndex].correctAnswer) btnClass += "border-green-500 bg-green-50 text-green-700";
                       else if (idx === quizState.selectedIndex) btnClass += "border-red-500 bg-red-50 text-red-700";
-                      else btnClass += "border-slate-100 text-slate-400";
+                      else btnClass += "border-slate-100 text-slate-300 opacity-50";
                     } else {
-                      btnClass += "border-slate-100 hover:border-purple-500 hover:bg-purple-50 text-slate-700";
+                      btnClass += "border-slate-100 hover:border-purple-500 hover:bg-purple-50 text-slate-600";
                     }
 
                     return (
                       <button key={idx} disabled={quizState.answered} onClick={() => handleQuizAnswer(idx)} className={btnClass}>
                         {opt}
+                        {quizState.answered && idx === quizQuestions[currentQuestionIndex].correctAnswer && <CheckCircle size={20} />}
+                        {!quizState.answered && <div className="w-4 h-4 rounded-full border-2 border-slate-200 group-hover:border-purple-500"></div>}
                       </button>
                     )
                   })}
 
                   {quizState.answered && (
-                    <div className="mt-6 pt-6 border-t border-slate-100 animate-in fade-in slide-in-from-bottom-4">
-                      <p className="font-bold text-slate-800 mb-2">Explanation:</p>
-                      <p className="text-slate-600 text-sm leading-relaxed mb-4">{quizQuestions[currentQuestionIndex].explanation}</p>
-                      <button onClick={nextQuizQuestion} className="w-full bg-purple-600 text-white font-bold py-3 rounded-xl hover:bg-purple-700 transition">
+                    <div className="mt-8 pt-6 border-t border-slate-100 animate-in fade-in slide-in-from-bottom-4">
+                      <div className="flex gap-3 mb-4">
+                         <div className="p-2 bg-purple-100 text-purple-600 rounded-lg h-fit"><Info size={20}/></div>
+                         <div>
+                            <p className="font-bold text-slate-800 mb-1">Explanation</p>
+                            <p className="text-slate-600 text-sm leading-relaxed">{quizQuestions[currentQuestionIndex].explanation}</p>
+                         </div>
+                      </div>
+                      <button onClick={nextQuizQuestion} className="w-full bg-purple-600 text-white font-bold py-4 rounded-xl hover:bg-purple-700 transition shadow-lg shadow-purple-200">
                         {currentQuestionIndex === quizQuestions.length - 1 ? 'Finish Quiz' : 'Next Question'}
                       </button>
                     </div>
@@ -760,35 +948,49 @@ const App = () => {
         )}
 
         {view === ViewState.ZAKAT && (
-          <div className="max-w-xl mx-auto bg-white p-8 rounded-3xl shadow-sm border border-slate-100">
-             <button onClick={() => setView(ViewState.HUB)} className="mb-6 text-slate-400 hover:text-slate-600"><ArrowLeft /></button>
-             <div className="flex items-center gap-3 mb-6 text-amber-600">
-               <Calculator size={32} />
-               <h2 className="text-2xl font-bold text-slate-800">Zakat Calculator</h2>
+          <div className="max-w-xl mx-auto bg-white p-8 sm:p-10 rounded-3xl shadow-lg border border-slate-100 mt-10">
+             <button onClick={() => setView(ViewState.HUB)} className="mb-8 text-slate-400 hover:text-slate-600 transition"><ArrowLeft /></button>
+             
+             <div className="text-center mb-10">
+                <div className="w-16 h-16 bg-amber-100 text-amber-600 rounded-2xl flex items-center justify-center mx-auto mb-4">
+                    <Calculator size={32} />
+                </div>
+                <h2 className="text-3xl font-bold text-slate-800">Zakat Calculator</h2>
+                <p className="text-slate-500 mt-2">Calculate 2.5% on your eligible wealth.</p>
              </div>
              
-             <div className="space-y-4">
+             <div className="space-y-6">
                <div>
-                 <label className="block text-sm font-bold text-slate-600 mb-1">Total Cash & Gold Value (USD)</label>
-                 <input type="number" value={zakatAssets} onChange={e => setZakatAssets(e.target.value)} className="w-full p-3 rounded-xl border border-slate-200" placeholder="e.g. 5000" />
+                 <label className="block text-xs font-bold text-slate-500 uppercase mb-2">Total Wealth (USD)</label>
+                 <div className="relative">
+                    <span className="absolute left-4 top-1/2 -translate-y-1/2 text-slate-400 font-bold">$</span>
+                    <input type="number" value={zakatAssets} onChange={e => setZakatAssets(e.target.value)} className="w-full pl-8 pr-4 py-4 rounded-xl border border-slate-200 focus:ring-2 focus:ring-amber-500/20 focus:border-amber-500 outline-none transition bg-slate-50" placeholder="e.g. 5000" />
+                 </div>
                </div>
                <div>
-                 <label className="block text-sm font-bold text-slate-600 mb-1">Current Gold Price (per gram USD)</label>
-                 <input type="number" value={goldPrice} onChange={e => setGoldPrice(e.target.value)} className="w-full p-3 rounded-xl border border-slate-200" />
+                 <label className="block text-xs font-bold text-slate-500 uppercase mb-2">Gold Price (per gram)</label>
+                 <div className="relative">
+                    <span className="absolute left-4 top-1/2 -translate-y-1/2 text-slate-400 font-bold">$</span>
+                    <input type="number" value={goldPrice} onChange={e => setGoldPrice(e.target.value)} className="w-full pl-8 pr-4 py-4 rounded-xl border border-slate-200 focus:ring-2 focus:ring-amber-500/20 focus:border-amber-500 outline-none transition bg-slate-50" />
+                 </div>
                </div>
-               <button onClick={calculateZakat} className="w-full bg-amber-500 text-white font-bold py-3 rounded-xl hover:bg-amber-600 transition">Calculate</button>
+               <button onClick={calculateZakat} className="w-full bg-amber-500 text-white font-bold py-4 rounded-xl hover:bg-amber-600 transition shadow-lg shadow-amber-200">Calculate Zakat</button>
              </div>
 
              {zakatResult && (
-               <div className={`mt-8 p-6 rounded-2xl text-center ${zakatResult.eligible ? 'bg-green-50 text-green-800' : 'bg-slate-50 text-slate-600'}`}>
-                 <p className="text-sm uppercase font-bold mb-2 opacity-70">Result</p>
+               <div className={`mt-8 p-8 rounded-2xl text-center border ${zakatResult.eligible ? 'bg-green-50 border-green-100 text-green-800' : 'bg-slate-50 border-slate-100 text-slate-600'}`}>
+                 <p className="text-xs uppercase font-bold mb-4 opacity-60 tracking-widest">Calculation Result</p>
                  {zakatResult.eligible ? (
                    <>
-                     <p className="text-3xl font-bold mb-1">${zakatResult.amount.toFixed(2)}</p>
-                     <p className="text-sm">Zakat Due (2.5%)</p>
+                     <p className="text-5xl font-bold mb-2 tracking-tight">${zakatResult.amount.toFixed(2)}</p>
+                     <p className="text-sm font-medium">Zakat Payable (2.5%)</p>
                    </>
                  ) : (
-                   <p>Not eligible. Your wealth is below the Nisab threshold of ${(zakatResult.nisaab).toFixed(2)}.</p>
+                   <div className="flex flex-col items-center gap-2">
+                        <span className="bg-white p-2 rounded-full shadow-sm"><X size={20}/></span>
+                        <p className="font-bold">Not Eligible</p>
+                        <p className="text-sm opacity-80 max-w-xs mx-auto">Your wealth is below the Nisab threshold of ${(zakatResult.nisaab).toFixed(2)}.</p>
+                   </div>
                  )}
                </div>
              )}
@@ -796,36 +998,41 @@ const App = () => {
         )}
 
         {view === ViewState.TASBIH && (
-          <div className="max-w-md mx-auto text-center pt-12">
-            <button onClick={() => setView(ViewState.HUB)} className="mb-6 text-slate-400 hover:text-slate-600"><ArrowLeft /></button>
-            <h2 className="text-3xl font-bold text-teal-800 mb-8">Digital Tasbih</h2>
+          <div className="max-w-md mx-auto text-center pt-12 h-full flex flex-col justify-center">
+            <div className="absolute top-8 left-4 sm:left-8">
+                <button onClick={() => setView(ViewState.HUB)} className="text-slate-400 hover:text-slate-600"><ArrowLeft /></button>
+            </div>
             
-            <div className="bg-white rounded-full w-64 h-64 mx-auto flex items-center justify-center shadow-2xl border-8 border-teal-50 relative mb-8">
-               <div className="text-center">
-                 <span className="block text-6xl font-bold text-teal-600 font-mono">{tasbihCount}</span>
-                 <span className="text-teal-400 text-xs uppercase tracking-widest">Count</span>
-               </div>
+            <h2 className="text-3xl font-bold text-teal-900 mb-10">Digital Tasbih</h2>
+            
+            <div className="relative mb-10 group cursor-pointer" onClick={incrementTasbih}>
+                <div className="absolute inset-0 bg-teal-500 rounded-full blur-3xl opacity-10 group-hover:opacity-20 transition duration-500"></div>
+                <div className="bg-white rounded-full w-72 h-72 mx-auto flex flex-col items-center justify-center shadow-[0_20px_50px_-12px_rgba(0,0,0,0.1)] border-8 border-slate-50 relative z-10 active:scale-95 transition duration-150 select-none">
+                    <span className="block text-8xl font-bold text-teal-600 font-mono tracking-tighter">{tasbihCount}</span>
+                    <span className="text-teal-400 text-xs uppercase tracking-[0.3em] mt-2">Dhikr</span>
+                </div>
             </div>
 
-            <button 
-              onClick={incrementTasbih}
-              className="w-full bg-teal-600 text-white font-bold text-xl py-6 rounded-2xl shadow-lg hover:bg-teal-700 active:scale-95 transition transform"
-            >
-              SubhanAllah
+            <p className="text-slate-400 text-sm mb-8">Tap the circle to count</p>
+            
+            <button onClick={() => { setTasbihCount(0); updateUserInDb({...user!, tasbihCount: 0})}} className="text-slate-400 text-sm hover:text-red-500 font-bold uppercase tracking-wider transition">
+                Reset Counter
             </button>
-            <button onClick={() => { setTasbihCount(0); updateUserInDb({...user!, tasbihCount: 0})}} className="mt-4 text-slate-400 text-sm hover:text-red-500">Reset Counter</button>
           </div>
         )}
 
         {view === ViewState.NAMES && (
-          <div className="max-w-4xl mx-auto">
-            <button onClick={() => setView(ViewState.HUB)} className="mb-6 text-slate-400 hover:text-slate-600"><ArrowLeft /></button>
-            <h2 className="text-3xl font-bold text-pink-600 mb-8 text-center">Names of Allah</h2>
-            <div className="grid grid-cols-2 md:grid-cols-3 gap-4">
+          <div className="max-w-5xl mx-auto">
+            <div className="flex items-center gap-3 mb-8">
+               <button onClick={() => setView(ViewState.HUB)} className="text-slate-400 hover:text-slate-600"><ArrowLeft /></button>
+               <h2 className="text-2xl font-bold text-pink-700">99 Names of Allah</h2>
+            </div>
+            <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 gap-4">
               {ALLAH_NAMES.map((n, i) => (
-                <div key={i} className="bg-white p-6 rounded-xl shadow-sm text-center border border-pink-50 hover:border-pink-200 transition">
-                  <h3 className="font-bold text-slate-800 text-lg">{n.name}</h3>
-                  <p className="text-pink-500 text-sm">{n.meaning}</p>
+                <div key={i} className="bg-white p-6 rounded-2xl shadow-sm border border-slate-100 hover:border-pink-200 hover:shadow-md transition text-center group">
+                  <div className="w-8 h-8 rounded-full bg-pink-50 text-pink-400 text-xs font-bold flex items-center justify-center mx-auto mb-3 group-hover:bg-pink-500 group-hover:text-white transition">{i + 1}</div>
+                  <h3 className="font-bold text-slate-800 text-lg mb-1">{n.name}</h3>
+                  <p className="text-pink-500 text-xs font-medium">{n.meaning}</p>
                 </div>
               ))}
             </div>
@@ -836,21 +1043,32 @@ const App = () => {
 
         {view === ViewState.DUA && (
           <div className="max-w-3xl mx-auto">
-            <div className="flex items-center gap-3 mb-6">
+            <div className="sticky top-0 bg-slate-50/90 backdrop-blur p-4 -mx-4 mb-6 border-b border-slate-200 z-20 flex items-center gap-3">
                <button onClick={() => setView(ViewState.HUB)} className="text-slate-400 hover:text-slate-600"><ArrowLeft /></button>
                <h2 className="text-2xl font-bold text-blue-800">Fortress of Dua</h2>
             </div>
-            <div className="space-y-8">
+            <div className="space-y-10">
               {DUAS_DATA.map((category, i) => (
                 <div key={i}>
-                  <h3 className="text-lg font-bold text-slate-400 uppercase tracking-wider mb-3">{category.category}</h3>
-                  <div className="space-y-4">
+                  <div className="flex items-center gap-4 mb-4">
+                    <div className="h-[1px] bg-slate-200 flex-1"></div>
+                    <h3 className="text-sm font-bold text-slate-400 uppercase tracking-widest bg-slate-100 px-3 py-1 rounded-full">{category.category}</h3>
+                    <div className="h-[1px] bg-slate-200 flex-1"></div>
+                  </div>
+                  <div className="space-y-6">
                     {category.items.map((dua, idx) => (
-                      <div key={idx} className="bg-white p-6 rounded-2xl shadow-sm border border-slate-100">
-                        <p className="font-arabic text-2xl text-right mb-3 text-slate-700 leading-loose">{dua.arabic}</p>
-                        <p className="text-slate-800 font-medium mb-1">{dua.translation}</p>
-                        <p className="text-slate-400 text-sm italic mb-2">{dua.transliteration}</p>
-                        <p className="text-xs text-blue-500 font-bold uppercase">{dua.ref}</p>
+                      <div key={idx} className="bg-white p-8 rounded-3xl shadow-sm border border-slate-100 relative overflow-hidden">
+                        <div className="absolute top-0 right-0 p-4 opacity-5 text-blue-500">
+                            <Coffee size={100} />
+                        </div>
+                        <p className="font-arabic text-3xl text-right mb-6 text-slate-700 leading-loose relative z-10" dir="rtl">{dua.arabic}</p>
+                        <div className="bg-blue-50/50 p-4 rounded-2xl mb-4 border border-blue-50">
+                            <p className="text-slate-800 font-medium leading-relaxed">"{dua.translation}"</p>
+                        </div>
+                        <p className="text-slate-400 text-sm italic mb-4">{dua.transliteration}</p>
+                        <div className="flex justify-end">
+                             <span className="text-[10px] font-bold uppercase bg-slate-100 text-slate-500 px-2 py-1 rounded border border-slate-200">{dua.ref}</span>
+                        </div>
                       </div>
                     ))}
                   </div>
@@ -861,20 +1079,20 @@ const App = () => {
         )}
 
         {view === ViewState.SALAH && (
-          <div className="max-w-3xl mx-auto">
-             <div className="flex items-center gap-3 mb-6">
+          <div className="max-w-4xl mx-auto">
+             <div className="flex items-center gap-3 mb-8">
                <button onClick={() => setView(ViewState.HUB)} className="text-slate-400 hover:text-slate-600"><ArrowLeft /></button>
                <h2 className="text-2xl font-bold text-green-800">Salah Guide (Hanafi)</h2>
             </div>
-            <div className="space-y-4">
+            <div className="grid md:grid-cols-2 gap-6">
               {SALAH_STEPS.map((step) => (
-                <div key={step.step} className="flex gap-4 bg-white p-6 rounded-2xl shadow-sm border border-slate-100 hover:border-green-200 transition">
-                  <div className="w-10 h-10 rounded-full bg-green-100 text-green-700 flex items-center justify-center font-bold flex-shrink-0">
+                <div key={step.step} className="flex gap-5 bg-white p-6 rounded-2xl shadow-sm border border-slate-100 hover:border-green-300 transition group">
+                  <div className="w-12 h-12 rounded-2xl bg-green-50 text-green-600 flex items-center justify-center font-bold text-xl flex-shrink-0 group-hover:bg-green-500 group-hover:text-white transition duration-300 shadow-sm">
                     {step.step}
                   </div>
                   <div>
-                    <h3 className="font-bold text-slate-800 text-lg mb-1">{step.title}</h3>
-                    <p className="text-slate-600 leading-relaxed">{step.desc}</p>
+                    <h3 className="font-bold text-slate-800 text-lg mb-2">{step.title}</h3>
+                    <p className="text-slate-600 leading-relaxed text-sm">{step.desc}</p>
                   </div>
                 </div>
               ))}
@@ -883,17 +1101,22 @@ const App = () => {
         )}
 
         {view === ViewState.FOODS && (
-          <div className="max-w-4xl mx-auto">
-            <div className="flex items-center gap-3 mb-6">
+          <div className="max-w-5xl mx-auto">
+            <div className="flex items-center gap-3 mb-8">
                <button onClick={() => setView(ViewState.HUB)} className="text-slate-400 hover:text-slate-600"><ArrowLeft /></button>
                <h2 className="text-2xl font-bold text-orange-800">Sunnah Foods</h2>
             </div>
-            <div className="grid md:grid-cols-2 gap-4">
+            <div className="grid sm:grid-cols-2 lg:grid-cols-3 gap-5">
               {SUNNAH_FOODS_DATA.map((food, i) => (
-                <div key={i} className="bg-white p-6 rounded-2xl shadow-sm border border-slate-100 hover:shadow-md transition">
-                  <h3 className="text-xl font-bold text-slate-800 mb-2">{food.name}</h3>
-                  <p className="text-slate-600 text-sm mb-3 h-10">{food.benefit}</p>
-                  <span className="inline-block bg-orange-100 text-orange-700 text-xs font-bold px-2 py-1 rounded">Ref: {food.ref}</span>
+                <div key={i} className="bg-white p-6 rounded-2xl shadow-sm border border-slate-100 hover:shadow-lg hover:border-orange-200 transition group h-full flex flex-col">
+                  <div className="flex justify-between items-start mb-4">
+                     <h3 className="text-xl font-bold text-slate-800">{food.name}</h3>
+                     <Utensils size={18} className="text-orange-300 group-hover:text-orange-500 transition"/>
+                  </div>
+                  <p className="text-slate-600 text-sm mb-6 flex-1 leading-relaxed">{food.benefit}</p>
+                  <div className="pt-4 border-t border-slate-50">
+                    <span className="inline-block bg-orange-50 text-orange-700 text-[10px] font-bold px-2 py-1 rounded border border-orange-100 uppercase tracking-wide">Ref: {food.ref}</span>
+                  </div>
                 </div>
               ))}
             </div>
@@ -901,28 +1124,37 @@ const App = () => {
         )}
 
         {view === ViewState.DREAM && (
-          <div className="max-w-xl mx-auto bg-white p-8 rounded-3xl shadow-sm border border-slate-100">
-            <button onClick={() => setView(ViewState.HUB)} className="mb-4 text-slate-400 hover:text-slate-600"><ArrowLeft /></button>
-            <h2 className="text-2xl font-bold text-indigo-800 mb-2">Dream Interpretation</h2>
-            <p className="text-slate-500 text-sm mb-6">Based on traditional Sunni sources (e.g., Ibn Sirin).</p>
+          <div className="max-w-2xl mx-auto bg-white p-10 rounded-3xl shadow-xl border border-slate-100 mt-8">
+            <button onClick={() => setView(ViewState.HUB)} className="mb-6 text-slate-400 hover:text-slate-600 transition"><ArrowLeft /></button>
+            <div className="text-center mb-8">
+                <div className="w-16 h-16 bg-indigo-50 rounded-full flex items-center justify-center mx-auto mb-4 text-indigo-500">
+                    <Moon size={32} />
+                </div>
+                <h2 className="text-3xl font-bold text-indigo-900 mb-2">Dream Interpretation</h2>
+                <p className="text-slate-500 text-sm">Based on traditional Sunni sources (e.g., Ibn Sirin).</p>
+            </div>
             
-            <textarea 
-              value={dreamInput}
-              onChange={(e) => setDreamInput(e.target.value)}
-              className="w-full p-4 rounded-xl border border-slate-200 focus:ring-2 focus:ring-indigo-500 outline-none h-32 resize-none mb-4"
-              placeholder="Describe your dream in detail..."
-            ></textarea>
+            <div className="relative">
+                <textarea 
+                value={dreamInput}
+                onChange={(e) => setDreamInput(e.target.value)}
+                className="w-full p-5 rounded-2xl border border-slate-200 focus:ring-4 focus:ring-indigo-500/10 focus:border-indigo-500 outline-none h-40 resize-none mb-4 bg-slate-50 transition"
+                placeholder="I saw myself flying over a green garden..."
+                ></textarea>
+                <div className="absolute bottom-8 right-4 text-xs text-slate-400 pointer-events-none">Detailed descriptions work best</div>
+            </div>
             
             <button 
               onClick={handleDreamInterpret}
               disabled={isChatLoading || !dreamInput}
-              className="w-full bg-indigo-600 text-white font-bold py-3 rounded-xl hover:bg-indigo-700 transition disabled:opacity-50"
+              className="w-full bg-indigo-600 text-white font-bold py-4 rounded-xl hover:bg-indigo-700 transition disabled:opacity-50 shadow-lg shadow-indigo-200"
             >
-              {isChatLoading ? 'Interpreting...' : 'Interpret Dream'}
+              {isChatLoading ? <Loader2 className="animate-spin mx-auto"/> : 'Interpret Dream'}
             </button>
 
             {dreamResult && (
-              <div className="mt-6 p-6 bg-indigo-50 rounded-2xl text-indigo-900 leading-relaxed text-sm">
+              <div className="mt-8 p-8 bg-indigo-50 rounded-2xl text-indigo-900 leading-loose text-sm border border-indigo-100 animate-in fade-in">
+                <h3 className="font-bold mb-2 flex items-center gap-2"><Sparkles size={16}/> Interpretation</h3>
                 {dreamResult}
               </div>
             )}
@@ -930,30 +1162,42 @@ const App = () => {
         )}
 
         {view === ViewState.HALAL && (
-          <div className="max-w-xl mx-auto bg-white p-8 rounded-3xl shadow-sm border border-slate-100">
-            <button onClick={() => setView(ViewState.HUB)} className="mb-4 text-slate-400 hover:text-slate-600"><ArrowLeft /></button>
-            <h2 className="text-2xl font-bold text-rose-800 mb-2">Halal/Haram Checker</h2>
-            <p className="text-slate-500 text-sm mb-6">Analyze ingredients or food items.</p>
+          <div className="max-w-2xl mx-auto bg-white p-10 rounded-3xl shadow-xl border border-slate-100 mt-8">
+            <button onClick={() => setView(ViewState.HUB)} className="mb-6 text-slate-400 hover:text-slate-600"><ArrowLeft /></button>
+            <div className="text-center mb-8">
+                <div className="w-16 h-16 bg-rose-50 rounded-full flex items-center justify-center mx-auto mb-4 text-rose-500">
+                    <Search size={32} />
+                </div>
+                <h2 className="text-3xl font-bold text-rose-800 mb-2">Halal Scanner</h2>
+                <p className="text-slate-500 text-sm">Analyze ingredients (E-numbers, additives) for Halal status.</p>
+            </div>
             
-            <div className="flex gap-2 mb-6">
-              <input 
-                type="text" 
-                value={halalInput}
-                onChange={(e) => setHalalInput(e.target.value)}
-                placeholder="e.g. Gelatin, Carmine, Red 40" 
-                className="flex-1 p-3 rounded-xl border border-slate-200 focus:ring-2 focus:ring-rose-500 outline-none"
-              />
+            <div className="flex gap-3 mb-8">
+              <div className="flex-1 relative">
+                <input 
+                    type="text" 
+                    value={halalInput}
+                    onChange={(e) => setHalalInput(e.target.value)}
+                    placeholder="e.g. E120, Gelatin, Carmine" 
+                    className="w-full pl-5 pr-4 py-4 rounded-xl border border-slate-200 focus:ring-4 focus:ring-rose-500/10 focus:border-rose-500 outline-none bg-slate-50"
+                />
+              </div>
               <button 
                 onClick={handleHalalCheck}
                 disabled={isChatLoading || !halalInput}
-                className="bg-rose-600 text-white px-6 rounded-xl font-bold hover:bg-rose-700 transition disabled:opacity-50"
+                className="bg-rose-600 text-white px-8 rounded-xl font-bold hover:bg-rose-700 transition disabled:opacity-50 shadow-lg shadow-rose-200"
               >
                 Check
               </button>
             </div>
 
-            {isChatLoading ? <div className="text-center text-rose-400"><Loader2 className="animate-spin inline" /> Checking...</div> : halalResult && (
-              <div className="p-6 bg-slate-50 rounded-2xl border border-slate-100 text-slate-800 leading-relaxed">
+            {isChatLoading ? (
+                <div className="text-center text-rose-400 py-10">
+                    <Loader2 className="animate-spin mx-auto mb-2" size={32}/> 
+                    Analyzing ingredients...
+                </div>
+            ) : halalResult && (
+              <div className="p-8 bg-slate-50 rounded-2xl border border-slate-100 text-slate-800 leading-relaxed animate-in slide-in-from-bottom-2">
                 {halalResult}
               </div>
             )}

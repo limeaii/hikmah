@@ -8,30 +8,72 @@
     <script src="https://cdn.tailwindcss.com"></script>
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-    <link href="https://fonts.googleapis.com/css2?family=Amiri:ital,wght@0,400;0,700;1,400&family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+    <link href="https://fonts.googleapis.com/css2?family=Amiri:ital,wght@0,400;0,700;1,400&family=Inter:wght@300;400;500;600;700&family=Lateef&display=swap" rel="stylesheet">
     <style>
       body {
         font-family: 'Inter', sans-serif;
+        background-color: #f8fafc;
+        background-image: radial-gradient(#e2e8f0 1px, transparent 1px);
+        background-size: 24px 24px;
       }
       .font-arabic {
         font-family: 'Amiri', serif;
-        line-height: 2.2;
       }
-      /* Custom Scrollbar */
+      .font-quran {
+        font-family: 'Lateef', serif; /* A thicker, more traditional Quranic font style if available, fallback to serif */
+      }
+      
+      /* Soft Scrollbar */
       ::-webkit-scrollbar {
-        width: 8px;
+        width: 6px;
+        height: 6px;
       }
       ::-webkit-scrollbar-track {
-        background: #f1f1f1;
+        background: transparent;
       }
       ::-webkit-scrollbar-thumb {
-        background: #10b981;
-        border-radius: 4px;
+        background: #cbd5e1;
+        border-radius: 10px;
       }
       ::-webkit-scrollbar-thumb:hover {
-        background: #059669;
+        background: #94a3b8;
+      }
+
+      /* Utilities */
+      .glass-panel {
+        background: rgba(255, 255, 255, 0.9);
+        backdrop-filter: blur(12px);
+        -webkit-backdrop-filter: blur(12px);
+      }
+      
+      .ornament-divider {
+        display: flex;
+        align-items: center;
+        text-align: center;
+        color: #cbd5e1;
+        margin: 2rem 0;
+      }
+      .ornament-divider::before, .ornament-divider::after {
+        content: '';
+        flex: 1;
+        border-bottom: 1px solid #e2e8f0;
+      }
+      .ornament-divider span {
+        padding: 0 10px;
+        font-size: 1.2rem;
       }
     </style>
+    <script>
+      // --- CRITICAL FIX FOR WHITE SCREEN ---
+      // Browsers don't have 'process'. We define it here.
+      // To "engrave" your API key so it works without the preview:
+      // Replace the empty string below with your actual key, e.g., API_KEY: 'AIzaSy...'
+      window.process = {
+        env: {
+          API_KEY: '' 
+        }
+      };
+    </script>
   <script type="importmap">
 {
   "imports": {
@@ -44,7 +86,7 @@
 }
 </script>
 </head>
-  <body class="bg-slate-50 text-slate-900 antialiased">
+  <body class="text-slate-800 antialiased selection:bg-emerald-100 selection:text-emerald-900">
     <div id="root"></div>
   </body>
 </html>

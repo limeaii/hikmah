@@ -1,9 +1,10 @@
-
 import { GoogleGenAI, Type, Schema } from "@google/genai";
 import { Ayah, Hadith, QuizQuestion } from '../types';
 
-// Use process.env.API_KEY as required
-const apiKey = process.env.API_KEY || '';
+// Safely retrieve API key from the polyfilled process.env
+// This prevents "process is not defined" errors in standard browsers
+const apiKey = (typeof process !== 'undefined' && process.env && process.env.API_KEY) || '';
+
 const ai = new GoogleGenAI({ apiKey });
 
 // --- Models ---
@@ -73,6 +74,10 @@ const quizSchema: Schema = {
 // --- API Methods ---
 
 export const getSurahAyahs = async (surahNumber: number, start: number, count: number): Promise<Ayah[]> => {
+  if (!apiKey) {
+    console.error("API Key is missing. Please add it to index.html");
+    return [];
+  }
   try {
     const prompt = `
       Retrieve verses ${start} to ${start + count - 1} of Surah number ${surahNumber}.
@@ -103,6 +108,7 @@ export const getSurahAyahs = async (surahNumber: number, start: number, count: n
 };
 
 export const getHanafiHadiths = async (topic: string = "general"): Promise<Hadith[]> => {
+  if (!apiKey) return [];
   try {
     // Enforcing Sunni Hanafi constraint in the prompt
     const prompt = `
@@ -133,6 +139,7 @@ export const getHanafiHadiths = async (topic: string = "general"): Promise<Hadit
 };
 
 export const askScholarAI = async (question: string): Promise<string> => {
+  if (!apiKey) return "API Key missing. Please check configuration.";
   try {
     const response = await ai.models.generateContent({
       model: fastModel,
@@ -160,6 +167,7 @@ export const askScholarAI = async (question: string): Promise<string> => {
 };
 
 export const getTafsir = async (surah: number, ayah: number): Promise<string> => {
+    if (!apiKey) return "API Key missing.";
     try {
          const response = await ai.models.generateContent({
             model: fastModel,
@@ -174,6 +182,7 @@ export const getTafsir = async (surah: number, ayah: number): Promise<string> =>
 // --- New Features ---
 
 export const getIslamicQuiz = async (): Promise<QuizQuestion[]> => {
+  if (!apiKey) return [];
   try {
     const topics = [
       "Prophets of Islam", 
@@ -207,6 +216,7 @@ export const getIslamicQuiz = async (): Promise<QuizQuestion[]> => {
 };
 
 export const interpretDream = async (dream: string): Promise<string> => {
+  if (!apiKey) return "API Key missing.";
   try {
     const response = await ai.models.generateContent({
       model: fastModel,
@@ -220,6 +230,7 @@ export const interpretDream = async (dream: string): Promise<string> => {
 };
 
 export const checkHalalStatus = async (query: string): Promise<string> => {
+   if (!apiKey) return "API Key missing.";
    try {
     const response = await ai.models.generateContent({
       model: fastModel,
